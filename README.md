@@ -27,12 +27,12 @@ sudo ./install-myhome.sh
 # albo, po "su -":
 ./install-myhome.sh
 
-# uruchomienie przez potok (np. z Gitea/GitHub) — MUSISZ już być rootem,
+# uruchomienie przez potok (Gitea) — MUSISZ już być rootem,
 # bo w potoku "$0" nie jest prawdziwym plikiem i skrypt nie może się sam
 # podnieść przez sudo:
-curl -fsSL <adres>/myhome-install.sh | bash
+curl -fsSL http://192.168.50.126:3000/gravi/home-server/raw/branch/main/install-myhome.sh | bash
 # albo bezpieczniej (pobierz, przejrzyj, potem uruchom):
-curl -fsSL <adres>/myhome-install.sh -o install-myhome.sh
+curl -fsSL http://192.168.50.126:3000/gravi/home-server/raw/branch/main/install-myhome.sh -o install-myhome.sh
 sudo bash install-myhome.sh
 ```
 
