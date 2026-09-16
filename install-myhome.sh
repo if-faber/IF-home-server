@@ -266,9 +266,11 @@ fi
 
 # Zasada dwufolderowa: pliki definicji stosów -> docker/app/<usługa>/,
 #                      dane trwałe (wolumeny/config/bazy) -> docker/app-data/<usługa>/
-# Na razie tylko gałąź główna — poszczególne podfoldery usług (myhome, memos,
+# Na razie tylko gałąź główna — poszczególne podfoldery usług (memos,
 # homeassistant, gitea...) powstaną, gdy dana usługa będzie faktycznie
 # wdrażana (przez Dockge albo ręcznie), zamiast tworzyć je z góry na zapas.
+# Wyjątek: docker/app/dockge i docker/app-data/dockge powstają już teraz,
+# w Kroku 5 — bo Dockge musi istnieć, zanim będzie mógł zarządzać resztą.
 MYHOME_DIRS=(
     "docker/app"
     "docker/app-data"
@@ -298,14 +300,18 @@ warn "Duże biblioteki danych (zdjęcia, filmy, skany NAS) montuj poza \$HOME, n
 # ---------------------------------------------------------------------------
 step "Dockge"
 
-# Wyjątek od zasady dwufolderowej: Dockge sam jest "menedżerem stosów", więc
-# jego docker-compose.yml siedzi bezpośrednio w docker/, a nie w docker/app/.
+# Dockge NIE jest wyjątkiem od zasady dwufolderowej — to po prostu pierwszy
+# stos, taki sam jak każdy przyszły: plik definicji w docker/app/dockge/,
+# dane trwałe w docker/app-data/dockge/. Jedyna różnica: te dwa foldery
+# tworzymy tu ręcznie (i od razu odpalamy stos), zamiast czekać, aż powstaną
+# przez UI Dockge — bo Dockge musi już działać, żeby mógł zarządzać resztą.
 # Jego katalog stosów (DOCKGE_STACKS_DIR) wskazuje na docker/app/, więc każdy
-# nowy stos utworzony w UI Dockge trafi tam automatycznie jako
-# docker/app/<nazwa>/compose.yaml — zgodnie z resztą konwencji.
-mkdir -p "${USER_HOME}/docker/app-data/dockge"
+# kolejny stos utworzony w UI Dockge sam wyląduje jako
+# docker/app/<nazwa>/compose.yaml — zgodnie z konwencją (Dockge widzi wtedy
+# też samego siebie jako jeden ze stosów w tym katalogu).
+mkdir -p "${USER_HOME}/docker/app/dockge" "${USER_HOME}/docker/app-data/dockge"
 
-cat << 'EOF' > "${USER_HOME}/docker/docker-compose.yml"
+cat << 'EOF' > "${USER_HOME}/docker/app/dockge/docker-compose.yml"
 services:
   dockge:
     image: louislam/dockge:1
@@ -315,15 +321,15 @@ services:
       - "5001:5001"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./app-data/dockge:/app/data
-      - ./app:/opt/stacks
+      - ../../app-data/dockge:/app/data
+      - ../:/opt/stacks
     environment:
       - DOCKGE_STACKS_DIR=/opt/stacks
 EOF
 
 chown -R "${TARGET_USER}:${TARGET_USER}" "${USER_HOME}/docker"
 
-run "Uruchomienie Dockge" docker compose -f "${USER_HOME}/docker/docker-compose.yml" up -d
+run "Uruchomienie Dockge" docker compose -f "${USER_HOME}/docker/app/dockge/docker-compose.yml" up -d
 
 info "Dockge będzie dostępne pod: http://<adres-serwera>:5001"
 
