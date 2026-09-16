@@ -72,23 +72,29 @@ powinny być montowane poza nim, np. w `/mnt/`).
 ```
 ~/
 ├── docker/
-│   ├── docker-compose.yml   # Dockge — wyjątek od zasady dwufolderowej,
-│   │                        # bo Dockge sam zarządza resztą stosów
-│   ├── app/                 # docker-compose.yml kolejnych usług
-│   └── app-data/            # dane trwałe kolejnych usług (w tym app-data/dockge)
+│   ├── app/
+│   │   └── dockge/          # docker-compose.yml Dockge — pierwszy stos,
+│   │                        #   tworzony od razu przez skrypt instalacyjny
+│   └── app-data/
+│       └── dockge/          # dane trwałe Dockge (jedyny podfolder tworzony od razu)
 ├── documentation/           # baza wiedzy
 ├── backups/                 # lokalne archiwa
 ├── blog/                    # (albo docs/ — do ustalenia)
-└── creativity/               # szkice i proof-of-concept
+└── creativity/              # szkice i proof-of-concept
 ```
 
-Podfoldery poszczególnych usług (`docker/app/<nazwa>`,
-`docker/app-data/<nazwa>`) nie są tworzone z góry — powstają dopiero, gdy
-dana usługa jest faktycznie wdrażana (przez Dockge albo ręcznie).
+Dockge nie jest wyjątkiem od zasady dwufolderowej — to po prostu pierwszy
+stos, taki sam jak każdy kolejny. `docker/app/dockge/` i
+`docker/app-data/dockge/` to jedyne podfoldery usług tworzone z góry przez
+skrypt (bo Dockge musi już działać, żeby zarządzać resztą). Podfoldery
+kolejnych usług (`docker/app/<nazwa>`, `docker/app-data/<nazwa>`) nie są
+tworzone z góry — powstają dopiero, gdy dana usługa jest faktycznie
+wdrażana (przez Dockge albo ręcznie).
 
 `DOCKGE_STACKS_DIR` Dockge wskazuje na `docker/app/`, więc każdy nowy stos
 założony w UI Dockge sam wyląduje jako `docker/app/<nazwa>/compose.yaml` —
-zgodnie z konwencją.
+zgodnie z konwencją (Dockge widzi wtedy też samego siebie jako jeden ze
+stosów w tym katalogu).
 
 ## Plan rozwoju
 
