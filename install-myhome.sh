@@ -315,7 +315,7 @@ mkdir -p "${USER_HOME}/docker/app/dockge" "${USER_HOME}/docker/app-data/dockge"
 cat << 'EOF' > "${USER_HOME}/docker/app/dockge/docker-compose.yml"
 services:
   dockge:
-    image: louislam/dockge:1
+    image: louislam/dockge:1.5.0
     container_name: dockge
     restart: unless-stopped
     ports:
