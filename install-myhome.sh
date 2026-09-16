@@ -390,7 +390,13 @@ step "Cockpit PCP"
 
 run "Aktualizacja listy pakietów" apt update
 run "Instalacja PCP" apt install -y cockpit-pcp pcp python3-pcp
-run "Włączenie pcp/pmcd" systemctl enable --now pcp pmcd
+
+# Pakiet "pcp" instaluje pmcd/pmlogger/pmie/pmproxy jako natywne usługi
+# systemd i sam je włącza przy instalacji. "pcp" to za to stary skrypt
+# SysV (init.d) bez ustawionych runlevels — próba "systemctl enable pcp"
+# kończy się błędem update-rc.d ("Default-Start contains no runlevels").
+# Dlatego włączamy tylko pmcd, a nie "pcp".
+run "Włączenie pmcd" systemctl enable --now pmcd
 run "Restart Cockpit" systemctl restart cockpit
 
 # ---------------------------------------------------------------------------
