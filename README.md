@@ -4,6 +4,8 @@ Skrypt startowy serwera domowego **myhome** — uruchamiany raz na czystym
 Debianie (instalacja netinst), instaluje i konfiguruje wszystko, co
 potrzebne do działania serwera.
 
+> **Nazewnictwo (2026-09-17):** repo Gitea przemianowane na **`gravi/IF-home-server`** (marka IdeaForge, dawniej `home-server`) — rename wykonany przez API Gitea. URL-e poniżej zaktualizowane do nowej nazwy; stary adres (`gravi/home-server`) nadal działa przez automatyczne przekierowanie Gitea, ale nie jest już kanoniczny.
+
 ## Filozofia
 
 Backup = obraz czystego systemu (bez danych) + ten skrypt. Przywrócenie
@@ -30,9 +32,9 @@ sudo ./install-myhome.sh
 # uruchomienie przez potok (Gitea) — MUSISZ już być rootem,
 # bo w potoku "$0" nie jest prawdziwym plikiem i skrypt nie może się sam
 # podnieść przez sudo:
-curl -fsSL http://192.168.50.126:3000/gravi/home-server/raw/branch/main/install-myhome.sh | bash
+curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh | bash
 # albo bezpieczniej (pobierz, przejrzyj, potem uruchom):
-curl -fsSL http://192.168.50.126:3000/gravi/home-server/raw/branch/main/install-myhome.sh -o install-myhome.sh
+curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh -o install-myhome.sh
 sudo bash install-myhome.sh
 ```
 
