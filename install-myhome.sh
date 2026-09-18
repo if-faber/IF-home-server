@@ -167,6 +167,102 @@ fi
 info "Użytkownik docelowy: $TARGET_USER"
 
 # ---------------------------------------------------------------------------
+# TUI: ekran powitalny + zbieranie danych instalacyjnych (whiptail)
+# ---------------------------------------------------------------------------
+# Przetestowane w sesji PuTTY (18.09.2026) — bez tej zmiennej ramki dialogów
+# bywają "krzaczkowate" w PuTTY (konflikt ACS/UTF-8 w ncurses).
+export NCURSES_NO_UTF8_ACS=1
+
+if ! command -v whiptail >/dev/null 2>&1; then
+    info "Instaluję whiptail (panel graficzny instalatora)..."
+    apt update >>"$LOG_FILE" 2>&1 || true
+    apt install -y whiptail >>"$LOG_FILE" 2>&1 || true
+fi
+
+USE_TUI=0
+if command -v whiptail >/dev/null 2>&1 && [ -t 0 ] && [ -t 1 ]; then
+    USE_TUI=1
+fi
+
+if [ "$USE_TUI" -eq 1 ]; then
+    WELCOME_MSG="Witaj w instalatorze aplikacji systemowych dla domowego serwera.
+
+Pomożemy Ci zainstalować niezbędne oprogramowanie do poprawnego \
+funkcjonowania serwera, w przyjazny sposób.
+
+Nie przerywaj raz rozpoczętego procesu instalacji — może to \
+spowodować uszkodzenie instalacji i późniejsze problemy.
+
+W trakcie instalacji możesz zostać poproszony o wpisanie danych \
+niezbędnych do instalacji (np. haseł) — nie odchodź od komputera, \
+aby móc je uzupełnić.
+
+Gotowy?"
+
+    if ! whiptail --title "Instalator serwera domowego" \
+        --yes-button "Tak, zaczynamy" --no-button "Anuluj" \
+        --yesno "$WELCOME_MSG" 20 70; then
+        echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"
+        exit 0
+    fi
+    whiptail --title "Instalator serwera domowego" --msgbox "Ruszamy i powodzenia!" 8 50
+
+    # --- Rola drukowania (zastępuje ręczne PRINT_SERVER_ROLE=...) ---
+    if whiptail --title "Serwer wydruku" \
+        --yes-button "Tak, serwer" --no-button "Nie, tylko klient" \
+        --yesno "Czy TEN komputer ma być serwerem wydruku — czyli będzie miał podłączoną fizyczną drukarkę i udostępni ją w sieci innym urządzeniom?
+
+Wybierz 'Nie, tylko klient', jeśli chcesz tylko móc drukować na drukarce udostępnionej przez inny komputer/serwer w sieci (tak jest w większości domów, gdzie serwer wydruku już gdzieś działa)." 16 70; then
+        PRINT_SERVER_ROLE="server"
+    else
+        PRINT_SERVER_ROLE="client"
+    fi
+    info "Rola drukowania: $PRINT_SERVER_ROLE"
+
+    # --- Hasło do udostępniania plików w sieci (Samba) ---
+    while true; do
+        SMB_PASSWORD=$(whiptail --title "Udostępnianie plików w sieci" \
+            --passwordbox "Ustaw hasło do udostępniania plików w sieci dla użytkownika '${TARGET_USER}'.
+
+Będzie ono potrzebne na innych komputerach/urządzeniach w domu, żeby połączyć się z udostępnionymi folderami." \
+            13 70 3>&1 1>&2 2>&3) || { echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"; exit 0; }
+
+        SMB_PASSWORD_REPEAT=$(whiptail --title "Udostępnianie plików w sieci" \
+            --passwordbox "Wpisz hasło jeszcze raz, żeby je potwierdzić." \
+            10 70 3>&1 1>&2 2>&3) || { echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"; exit 0; }
+
+        if [ -n "$SMB_PASSWORD" ] && [ "$SMB_PASSWORD" = "$SMB_PASSWORD_REPEAT" ]; then
+            unset SMB_PASSWORD_REPEAT
+            break
+        fi
+        whiptail --title "Udostępnianie plików w sieci" \
+            --msgbox "Hasła się różnią albo pole było puste — spróbuj ponownie." 8 60
+    done
+    info "Hasło Samby ustawione (zostanie użyte w Kroku 6)."
+
+    # --- Podsumowanie przed startem ---
+    SUMMARY_MSG="Gotowe do instalacji.
+
+Rola drukowania: $([ "$PRINT_SERVER_ROLE" = "server" ] && echo "serwer" || echo "tylko klient")
+Hasło do udostępniania plików: ustawione
+
+Rozpoczynamy właściwą instalację?"
+    if ! whiptail --title "Instalator serwera domowego" \
+        --yes-button "Tak, instaluj" --no-button "Anuluj" \
+        --yesno "$SUMMARY_MSG" 14 60; then
+        echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"
+        exit 0
+    fi
+else
+    warn "whiptail niedostępny albo brak terminala (np. uruchomienie przez 'curl | bash') — pomijam panel graficzny."
+    PRINT_SERVER_ROLE="${PRINT_SERVER_ROLE:-client}"
+    if [ -z "${SMB_PASSWORD-}" ]; then
+        fail "brak panelu graficznego i brak zmiennej SMB_PASSWORD. Uruchom w prawdziwym terminalu (np. przez PuTTY), albo ustaw ręcznie: SMB_PASSWORD='...' TARGET_USER=... sudo -E $0"
+    fi
+fi
+
+
+# ---------------------------------------------------------------------------
 # Krok 0: sudo dla użytkownika docelowego
 # ---------------------------------------------------------------------------
 step "sudo, curl, git, lsb-release"
@@ -343,8 +439,22 @@ run "Aktualizacja listy pakietów" apt update
 run "Instalacja Samby" apt install -y samba samba-common-bin
 run "Włączenie usług smbd/nmbd" systemctl enable --now smbd nmbd
 
-info "Ustaw hasło Samby dla '${TARGET_USER}' (wymagane interaktywnie):"
-smbpasswd -a "$TARGET_USER"
+if [ -n "${SMB_PASSWORD-}" ]; then
+    info "Ustawianie hasła Samby dla '${TARGET_USER}' (zebrane wcześniej w panelu)..."
+    if smbpasswd -a -s "$TARGET_USER" >>"$LOG_FILE" 2>&1 <<SMBPASS_EOF
+$SMB_PASSWORD
+$SMB_PASSWORD
+SMBPASS_EOF
+    then
+        info "Hasło Samby ustawione."
+    else
+        fail "nie udało się ustawić hasła Samby (zobacz $LOG_FILE)."
+    fi
+    unset SMB_PASSWORD
+else
+    info "Ustaw hasło Samby dla '${TARGET_USER}' (wymagane interaktywnie):"
+    smbpasswd -a "$TARGET_USER"
+fi
 
 # ---------------------------------------------------------------------------
 # Krok 7: Cockpit + wtyczki
@@ -353,6 +463,8 @@ step "Cockpit i wtyczki"
 
 run "Instalacja Cockpit" apt install -y cockpit
 run "Włączenie cockpit.socket" systemctl enable --now cockpit.socket
+
+run "Oficjalny dodatek: diagnostyka (sosreport)" apt install -y cockpit-sosreport
 
 # Wtyczki 45Drives (Navigator, File Sharing, Identities)
 run_sh "Repozytorium 45Drives" "curl -sSL https://repo.45drives.com/setup | bash"
@@ -368,11 +480,18 @@ echo "deb [trusted=yes arch=all] https://chrisjbawden.github.io/cockpit-dockerma
 run "Aktualizacja listy pakietów" apt update
 run "Wtyczka: Docker Manager" apt install -y dockermanager
 
-rm -rf /usr/share/cockpit/sensors
-run "Wtyczka: Sensors" git clone --depth 1 https://github.com/ocristopfer/cockpit-sensors.git /usr/share/cockpit/sensors
+# Wtyczka Sensors (ocristopfer/cockpit-sensors) ŚWIADOMIE pominięta: pokazuje
+# temperatury tylko w Fahrenheitach (nieprzydatne), a CTOP (już zainstalowany
+# niżej) i tak pokazuje temperatury nvme/CPU/WiFi/GPU w Celsjuszach — Sensors
+# dublowałby tę funkcję bez żadnej przewagi, a wymagał dodatkowego kroku
+# budowania (make + npm).
 
-rm -rf /usr/share/cockpit/compose
-run "Wtyczka: Compose" git clone --depth 1 https://github.com/RXTX4816/cockpit-compose.git /usr/share/cockpit/compose
+# Wtyczka Compose (RXTX4816/cockpit-compose) ŚWIADOMIE pominięta: dubluje
+# funkcję, którą już mamy w Dockge (zarządzanie stosami Docker Compose), a
+# wymaga Node.js 22+ do zbudowania (tu mamy 20.x) — niepotrzebna złożoność
+# dla funkcji, którą i tak robi Dockge. Szablony compose.yaml dla
+# poszczególnych usług będą opisane w dokumentacji (ideaforge.pl), nie w
+# osobnej wtyczce Cockpit.
 
 rm -rf /usr/share/cockpit/ctop
 run "Wtyczka: CTOP" git clone --depth 1 https://github.com/ismetozalp/ctop.git /usr/share/cockpit/ctop
@@ -415,5 +534,28 @@ info "Wyłączono i zamaskowano nfs-blkmap"
 # ---------------------------------------------------------------------------
 printf "\n%s%s=== myhome install: koniec %s ===%s\n" "$GREEN" "$BOLD" "$(date '+%Y-%m-%d %H:%M:%S')" "$RESET"
 echo "=== myhome install: koniec $(date '+%Y-%m-%d %H:%M:%S') ===" >> "$LOG_FILE"
-info "Zalecany restart systemu: sudo reboot"
 info "Pełny log instalacji: $LOG_FILE"
+
+SERVER_IP="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src"){print $(i+1); exit}}')"
+[ -z "$SERVER_IP" ] && SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+[ -z "$SERVER_IP" ] && SERVER_IP="<adres IP tego serwera>"
+
+if [ "${USE_TUI:-0}" -eq 1 ]; then
+    FINAL_MSG="Gratulacje! Wszystkie aplikacje zostały zainstalowane.
+
+Dostęp do aplikacji znajdziesz w instrukcji na stronie startowej: http://${SERVER_IP}
+
+Aby dokończyć proces, należy ponownie uruchomić komputer."
+
+    if whiptail --title "Instalator serwera domowego" \
+        --yes-button "Uruchom ponownie" --no-button "Później" \
+        --yesno "$FINAL_MSG" 14 70; then
+        info "Restart systemu na życzenie użytkownika..."
+        reboot
+    else
+        info "Restart odłożony — pamiętaj, żeby uruchomić komputer ponownie: sudo reboot"
+    fi
+else
+    info "Dostęp do aplikacji: http://${SERVER_IP}"
+    info "Zalecany restart systemu: sudo reboot"
+fi
