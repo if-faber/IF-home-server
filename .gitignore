@@ -1,0 +1,8 @@
+# Sekrety per-usługa (docker/app/<usługa>/.env)
+docker/app/*/.env
+
+# Kopie zapasowe robocze (tworzone podczas iteracji nad skryptem)
+install-myhome.sh.bak-*
+
+# Wewnętrzne notatki robocze (lustro dokumentu projektu Claude, nie do publikacji)
+CLAUDE-*.md
