@@ -146,6 +146,54 @@ założony w UI Dockge sam wyląduje jako `docker/app/<nazwa>/compose.yaml` —
 zgodnie z konwencją (Dockge widzi wtedy też samego siebie jako jeden ze
 stosów w tym katalogu).
 
+## Jak bezpiecznie dodać nowy kontener (stos) przez Dockge (WAŻNE)
+
+Dockge sam działa w kontenerze i uruchamia `docker compose` dla każdego
+stosu przez `/var/run/docker.sock` — polecenia trafiają do prawdziwego
+Dockera na hoście, ale **ścieżki względne w compose.yaml (`../../app-data/...`)
+bywają zawodne**, jeśli coś w konfiguracji Dockge się nie zgadza (np. po
+ręcznej edycji). Dla pewności — żeby dane na 100% trafiały tam, gdzie
+powinny — rób tak przy każdym nowym stosie:
+
+**1. Utwórz strukturę katalogów PRZED wdrożeniem kontenera** (zamień
+`<nazwa-uslugi>` na nazwę stosu, np. `if-startpage`):
+
+```
+mkdir -p ~/docker/app-data/<nazwa-uslugi>/config
+mkdir -p ~/docker/app-data/<nazwa-uslugi>/backups
+```
+
+**2. Nadaj właściwe uprawnienia** (na wypadek gdyby coś tworzyło pliki
+jako root):
+
+```
+sudo chown -R $(whoami):$(whoami) ~/docker/app-data/<nazwa-uslugi>
+```
+
+**3. W pliku `compose.yaml` używaj PEŁNYCH ścieżek zaczynających się od
+`/home/<Twoja-nazwa-użytkownika>/...`, a nie ścieżek względnych
+(`../../app-data/...`)**. Sprawdź swoją nazwę użytkownika i katalog domowy
+komendą `echo $HOME` (np. `/home/marek`) i wstaw ją bezpośrednio:
+
+```yaml
+    volumes:
+      - /home/TWOJA-NAZWA-UZYTKOWNIKA/docker/app-data/<nazwa-uslugi>/config:/app/config
+      - /home/TWOJA-NAZWA-UZYTKOWNIKA/docker/app-data/<nazwa-uslugi>/backups:/app/backups
+```
+
+zamiast:
+
+```yaml
+    volumes:
+      - ../../app-data/<nazwa-uslugi>/config:/app/config    # NIE rob tak
+      - ../../app-data/<nazwa-uslugi>/backups:/app/backups  # NIE rob tak
+```
+
+Pełna ścieżka zawsze wskazuje na to samo miejsce, niezależnie od tego, jak
+Dockge akurat widzi swój katalog stosów — to najbezpieczniejszy wariant,
+zwłaszcza że pakiet jest pomyślany dla osób nietechnicznych, które nie
+będą w stanie samodzielnie zdiagnozować błędnie zamontowanego wolumenu.
+
 ## Plan rozwoju
 
 - Pełne menu/TUI (na wzór KIAUH) do wyboru opcjonalnych komponentów —
