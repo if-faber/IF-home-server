@@ -1,10 +1,11 @@
-# myhome-install
+# IF-home-server
 
-Skrypt startowy serwera domowego **myhome** — uruchamiany raz na czystym
+Instalator systemowy domowego serwera — uruchamiany raz na czystym
 Debianie (instalacja netinst), instaluje i konfiguruje wszystko, co
-potrzebne do działania serwera.
-
-> **Nazewnictwo (2026-09-17):** repo Gitea przemianowane na **`gravi/IF-home-server`** (marka IdeaForge, dawniej `home-server`) — rename wykonany przez API Gitea. URL-e poniżej zaktualizowane do nowej nazwy; stary adres (`gravi/home-server`) nadal działa przez automatyczne przekierowanie Gitea, ale nie jest już kanoniczny.
+potrzebne do działania serwera (Cockpit, Samba, serwer druku, Dockge).
+Część pakietu **IdeaForge** dla serwerów domowych — zobacz też
+[`IF-startpage`](https://github.com/if-faber/IF-startpage), jego stronę
+startową.
 
 ## Filozofia
 
@@ -28,14 +29,24 @@ minut, a nie godziny ręcznej konfiguracji.
 sudo ./install-myhome.sh
 # albo, po "su -":
 ./install-myhome.sh
+```
 
-# uruchomienie przez potok (Gitea) — MUSISZ już być rootem,
-# bo w potoku "$0" nie jest prawdziwym plikiem i skrypt nie może się sam
-# podnieść przez sudo:
-curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh | bash
+**Z GitHuba** (publiczne, spoza sieci domowej) — MUSISZ już być rootem,
+bo w potoku `"$0"` nie jest prawdziwym plikiem i skrypt nie może się sam
+podnieść przez `sudo`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh | bash
 # albo bezpieczniej (pobierz, przejrzyj, potem uruchom):
-curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh -o install-myhome.sh
+curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh -o install-myhome.sh
 sudo bash install-myhome.sh
+```
+
+**Z Gitea** (tylko w sieci domowej, ten sam kod, kanoniczne źródło dla
+prac rozwojowych):
+
+```sh
+curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh | bash
 ```
 
 ### Zmienne środowiskowe (konfiguracja)
