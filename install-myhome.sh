@@ -429,15 +429,25 @@ step "Dockge"
 # dane trwałe w docker/app-data/dockge/. Jedyna różnica: te dwa foldery
 # tworzymy tu ręcznie (i od razu odpalamy stos), zamiast czekać, aż powstaną
 # przez UI Dockge — bo Dockge musi już działać, żeby mógł zarządzać resztą.
-# Jego katalog stosów (DOCKGE_STACKS_DIR) wskazuje na docker/app/, więc każdy
-# kolejny stos utworzony w UI Dockge sam wyląduje jako
-# docker/app/<nazwa>/compose.yaml — zgodnie z konwencją (Dockge widzi wtedy
-# też samego siebie jako jeden ze stosów w tym katalogu).
+#
+# WAŻNE — mapowanie ścieżek dla Dockge musi być 1:1 (host == kontener):
+# Dockge sam działa w kontenerze i to ON uruchamia `docker compose up` dla
+# każdego stosu, ale robi to przez /var/run/docker.sock, czyli polecenia i
+# tak trafiają do dockerd na hoście. Ścieżki WZGLĘDNE w compose.yaml stosu
+# (np. ../../app-data/...) są rozwiązywane względem katalogu roboczego
+# procesu, który je uruchamia — czyli wnętrza kontenera Dockge. Jeśli
+# katalog stosów wewnątrz kontenera (DOCKGE_STACKS_DIR) nazywa się inaczej
+# niż prawdziwa ścieżka na hoście (np. /opt/stacks w kontenerze vs
+# docker/app na hoście), dockerd na hoście tworzy bind-mounty pod BŁĘDNĄ,
+# nieistniejącą ścieżką /opt/stacks/... na hoście zamiast w docker/app-data/.
+# (patrz https://github.com/louislam/dockge/discussions/146). Dlatego
+# montujemy i ustawiamy DOCKGE_STACKS_DIR na dokładnie tę samą, pełną
+# ścieżkę hosta po obu stronach dwukropka.
 mkdir -p "${USER_HOME}/docker/app/dockge" "${USER_HOME}/docker/app-data/dockge"
 
 DOCKGE_COMPOSE="${USER_HOME}/docker/app/dockge/docker-compose.yml"
 if [ ! -f "$DOCKGE_COMPOSE" ]; then
-    cat << 'EOF' > "$DOCKGE_COMPOSE"
+    cat << EOF > "$DOCKGE_COMPOSE"
 services:
   dockge:
     image: louislam/dockge:1.5.0
@@ -447,10 +457,10 @@ services:
       - "5001:5001"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ../../app-data/dockge:/app/data
-      - ../:/opt/stacks
+      - ${USER_HOME}/docker/app-data/dockge:/app/data
+      - ${USER_HOME}/docker/app:${USER_HOME}/docker/app
     environment:
-      - DOCKGE_STACKS_DIR=/opt/stacks
+      - DOCKGE_STACKS_DIR=${USER_HOME}/docker/app
 EOF
     info "Utworzono docker-compose.yml dla Dockge"
 else
