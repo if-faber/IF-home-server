@@ -414,7 +414,9 @@ step "Dockge"
 # też samego siebie jako jeden ze stosów w tym katalogu).
 mkdir -p "${USER_HOME}/docker/app/dockge" "${USER_HOME}/docker/app-data/dockge"
 
-cat << 'EOF' > "${USER_HOME}/docker/app/dockge/docker-compose.yml"
+DOCKGE_COMPOSE="${USER_HOME}/docker/app/dockge/docker-compose.yml"
+if [ ! -f "$DOCKGE_COMPOSE" ]; then
+    cat << 'EOF' > "$DOCKGE_COMPOSE"
 services:
   dockge:
     image: louislam/dockge:1.5.0
@@ -429,6 +431,12 @@ services:
     environment:
       - DOCKGE_STACKS_DIR=/opt/stacks
 EOF
+    info "Utworzono docker-compose.yml dla Dockge"
+else
+    # Dockge ma własny edytor YAML w UI — jeśli plik już istnieje (reinstalacja
+    # albo ręczna edycja przez usera), nie nadpisujemy go domyślną wersją.
+    info "docker-compose.yml dla Dockge już istnieje — zostawiam bez zmian (mógł być edytowany ręcznie w Dockge)"
+fi
 
 chown -R "${TARGET_USER}:${TARGET_USER}" "${USER_HOME}/docker"
 
