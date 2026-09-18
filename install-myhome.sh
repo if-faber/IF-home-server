@@ -11,12 +11,12 @@
 #   sudo ./install-myhome.sh
 #   (albo, po "su -":  ./install-myhome.sh)
 #
-#   Uruchomienie przez potok (curl z Gitea) MUSI już być rootem,
+#   Uruchomienie przez potok (curl) MUSI już być rootem,
 #   bo w takim wypadku "$0" nie jest prawdziwym plikiem i skrypt nie może
 #   sam się podnieść przez sudo:
-#     curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh | bash
 #     # gdy jesteś rootem, albo bezpieczniej:
-#     curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh -o install-myhome.sh && sudo bash install-myhome.sh
+#     curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh -o install-myhome.sh && sudo bash install-myhome.sh
 #
 # Automatyczne wykrywanie użytkownika docelowego (tego utworzonego podczas
 # instalacji Debiana), w kolejności:

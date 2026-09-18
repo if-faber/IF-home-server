@@ -42,12 +42,9 @@ curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/instal
 sudo bash install-myhome.sh
 ```
 
-**Z Gitea** (tylko w sieci domowej, ten sam kod, kanoniczne źródło dla
-prac rozwojowych):
-
-```sh
-curl -fsSL http://192.168.50.126:3000/gravi/IF-home-server/raw/branch/main/install-myhome.sh | bash
-```
+> Wewnętrzny adres LAN (Gitea) dla prac rozwojowych w sieci domowej nie
+> jest tu publikowany — kod na Gitea i GitHubie jest identyczny, więc do
+> instalacji zawsze wystarczy publiczny adres z GitHuba powyżej.
 
 ### Zmienne środowiskowe (konfiguracja)
 
