@@ -29,6 +29,12 @@
 set -euo pipefail
 
 LOG_FILE="/var/log/myhome-install.log"
+# Jeśli z jakiegoś powodu nie da się pisać do /var/log/ (np. pozostałość po
+# wcześniejszym teście z dziwnymi uprawnieniami/atrybutem pliku), nie wywalaj
+# całego instalatora na samym starcie — przełącz się na /tmp.
+if ! : >> "$LOG_FILE" 2>/dev/null; then
+    LOG_FILE="/tmp/myhome-install.log"
+fi
 echo "=== myhome install: start $(date '+%Y-%m-%d %H:%M:%S') ===" >> "$LOG_FILE"
 
 # ---------------------------------------------------------------------------
