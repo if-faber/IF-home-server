@@ -31,16 +31,25 @@ sudo ./install-myhome.sh
 ./install-myhome.sh
 ```
 
-**Z GitHuba** (publiczne, spoza sieci domowej) — MUSISZ już być rootem,
-bo w potoku `"$0"` nie jest prawdziwym plikiem i skrypt nie może się sam
-podnieść przez `sudo`:
+**Z GitHuba** (publiczne, spoza sieci domowej):
+
+Na świeżym Debianie (netinst) po pierwszym zalogowaniu na konsoli jesteś
+już **rootem** — `sudo` nie istnieje (nie jest tworzony domyślnie) i
+**`curl` też prawdopodobnie nie jest zainstalowany**. `apt`/`apt-get`
+zawsze są dostępne (to część samego systemu), więc od tego zaczynasz:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh | bash
-# albo bezpieczniej (pobierz, przejrzyj, potem uruchom):
+# tylko jeśli curl nie jest jeszcze zainstalowany (na czystym netinst zwykle nie jest):
+command -v curl >/dev/null || (apt-get update && apt-get install -y curl)
+
+# pobierz i uruchom instalator — już jako root, sudo niepotrzebne:
 curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh -o install-myhome.sh
-sudo bash install-myhome.sh
+bash install-myhome.sh
 ```
+
+`sudo` nie jest tu potrzebne (jesteś już rootem) — sam skrypt instaluje
+`sudo` dla wykrytego użytkownika w Kroku 0, żeby był dostępny **po**
+instalacji, do codziennej pracy.
 
 > Wewnętrzny adres LAN (Gitea) dla prac rozwojowych w sieci domowej nie
 > jest tu publikowany — kod na Gitea i GitHubie jest identyczny, więc do
