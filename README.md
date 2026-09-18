@@ -22,6 +22,49 @@ minut, a nie godziny ręcznej konfiguracji.
 - Dostęp do internetu (pobiera pakiety z apt, repozytoria Dockera i
   wtyczek Cockpit z GitHuba).
 
+## Pierwsze kroki na zupełnie nowym Debianie (WAŻNE — przeczytaj przed instalacją)
+
+Świeży Debian (netinst) **domyślnie nie ma ani `curl`, ani `sudo`**. Co
+więcej — jeśli podczas instalacji Debiana ustawiłeś hasło dla konta
+**root**, Twoje zwykłe konto użytkownika **nie dostaje automatycznie**
+uprawnień administratora. To normalne działanie Debiana, nie błąd i nie
+usterka tego instalatora. Zrób to raz, zanim uruchomisz cokolwiek innego —
+wykonuj polecenia dokładnie w tej kolejności:
+
+1. Połącz się z serwerem (np. przez PuTTY) i zaloguj się jako swój zwykły
+   użytkownik.
+2. Przełącz się na konto root:
+   ```sh
+   su -
+   ```
+   Zapyta o hasło — podaj hasło **roota**, czyli to, które ustawiłeś
+   podczas instalacji Debiana (NIE hasło swojego zwykłego konta, jeśli są
+   różne). Prompt zmieni się na coś w stylu `root@nazwa-serwera:~#`.
+3. Zainstaluj `sudo` i dodaj do niego swojego użytkownika (**podmień
+   `twoja-nazwa` na swoją prawdziwą nazwę użytkownika**, tę której użyłeś
+   przy logowaniu w kroku 1):
+   ```sh
+   apt-get update
+   apt-get install -y sudo
+   usermod -aG sudo twoja-nazwa
+   ```
+4. Wyjdź z sesji roota:
+   ```sh
+   exit
+   ```
+5. **Zamknij całe okno PuTTY i połącz się jeszcze raz od nowa** (samo
+   `exit` nie wystarczy). To konieczne, żeby system zauważył nowe
+   uprawnienia — bez tego kroku `sudo` i tak zwróci błąd, że nie jesteś w
+   pliku sudoers.
+6. Po ponownym zalogowaniu sprawdź, czy `sudo` działa, i zainstaluj
+   `curl` (poda hasło swojego **zwykłego** użytkownika, nie roota):
+   ```sh
+   sudo apt-get install -y curl
+   ```
+
+Dopiero teraz masz `curl` i działające `sudo` — możesz przejść do
+instalacji poniżej.
+
 ## Użycie
 
 ```sh
@@ -31,25 +74,13 @@ sudo ./install-myhome.sh
 ./install-myhome.sh
 ```
 
-**Z GitHuba** (publiczne, spoza sieci domowej):
-
-Na świeżym Debianie (netinst) po pierwszym zalogowaniu na konsoli jesteś
-już **rootem** — `sudo` nie istnieje (nie jest tworzony domyślnie) i
-**`curl` też prawdopodobnie nie jest zainstalowany**. `apt`/`apt-get`
-zawsze są dostępne (to część samego systemu), więc od tego zaczynasz:
+**Z GitHuba** (publiczne, spoza sieci domowej), po wykonaniu kroków
+powyżej:
 
 ```sh
-# tylko jeśli curl nie jest jeszcze zainstalowany (na czystym netinst zwykle nie jest):
-command -v curl >/dev/null || (apt-get update && apt-get install -y curl)
-
-# pobierz i uruchom instalator — już jako root, sudo niepotrzebne:
 curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh -o install-myhome.sh
-bash install-myhome.sh
+sudo bash install-myhome.sh
 ```
-
-`sudo` nie jest tu potrzebne (jesteś już rootem) — sam skrypt instaluje
-`sudo` dla wykrytego użytkownika w Kroku 0, żeby był dostępny **po**
-instalacji, do codziennej pracy.
 
 > Wewnętrzny adres LAN (Gitea) dla prac rozwojowych w sieci domowej nie
 > jest tu publikowany — kod na Gitea i GitHubie jest identyczny, więc do

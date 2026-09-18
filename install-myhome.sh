@@ -18,6 +18,20 @@
 #     # gdy jesteś rootem, albo bezpieczniej:
 #     curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh -o install-myhome.sh && sudo bash install-myhome.sh
 #
+#   UWAGA - świeży Debian (netinst) może "zrobić kuku": domyślnie NIE MA
+#   ani curl, ani sudo, a jeśli podczas instalacji Debiana ustawiłeś hasło
+#   roota, zwykły użytkownik nie dostaje sudo automatycznie. Zanim
+#   spróbujesz powyższych komend, zrób to jako pierwsze (pełna wersja z
+#   wyjaśnieniem: README.md, sekcja "Pierwsze kroki na zupełnie nowym
+#   Debianie"):
+#     su -                              # hasło ROOTA z instalacji Debiana
+#     apt-get update
+#     apt-get install -y sudo
+#     usermod -aG sudo twoja-nazwa      # podmień na swoją nazwę uzytkownika
+#     exit
+#     # >>> zamknij i otworz polaczenie PuTTY od nowa, zeby sudo zadzialalo <<<
+#     sudo apt-get install -y curl
+#
 # Automatyczne wykrywanie użytkownika docelowego (tego utworzonego podczas
 # instalacji Debiana), w kolejności:
 #   1. $SUDO_USER, jeśli skrypt wywołano przez sudo
@@ -127,9 +141,16 @@ if [ "$(id -u)" -ne 0 ]; then
     else
         echo "BŁĄD: ten skrypt musi być uruchomiony jako root." >&2
         echo "" >&2
-        echo "Jeśli to świeży system (bez sudo) albo uruchamiasz przez potok" >&2
-        echo "(curl | bash), zaloguj się jako root ('su -') i uruchom ponownie," >&2
-        echo "albo: curl -fsSL <adres> -o install.sh && sudo bash install.sh" >&2
+        echo "Jeśli to świeży system bez sudo (typowe na czystym netinst):" >&2
+        echo "  su -                          # hasło ROOTA z instalacji Debiana" >&2
+        echo "  bash $0" >&2
+        echo "" >&2
+        echo "Jeśli sudo już masz, ale zapomniałeś go użyć:" >&2
+        echo "  sudo bash $0" >&2
+        echo "" >&2
+        echo "Pełna instrukcja (gdy nie masz jeszcze ani curl, ani sudo):" >&2
+        echo "  README.md, sekcja "Pierwsze kroki na zupełnie nowym Debianie"" >&2
+        echo "  https://github.com/if-faber/IF-home-server" >&2
         exit 1
     fi
 fi
