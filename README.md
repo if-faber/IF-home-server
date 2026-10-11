@@ -16,71 +16,83 @@ minut, a nie godziny ręcznej konfiguracji.
 
 ## Wymagania
 
-- Czysty Debian (netinst), zalogowany jako **root** (`su -`) — na świeżym
-  systemie `sudo` jeszcze nie istnieje, więc skrypt musi być uruchomiony
-  wprost jako root.
+- Czysty Debian (netinst) z kontem użytkownika i włączonym „SSH server”
+  (wybór oprogramowania podczas instalacji Debiana). `sudo` i `curl`
+  doinstalujesz w kroku 3 poniżej.
+- Kabel sieciowy podczas instalacji Debiana (netinst pobiera pakiety z internetu).
 - Dostęp do internetu (pobiera pakiety z apt, repozytoria Dockera i
   wtyczek Cockpit z GitHuba).
 
-## Pierwsze kroki na zupełnie nowym Debianie (WAŻNE — przeczytaj przed instalacją)
+## Instalacja krok po kroku
 
-Świeży Debian (netinst) **domyślnie nie ma ani `curl`, ani `sudo`**. Co
-więcej — jeśli podczas instalacji Debiana ustawiłeś hasło dla konta
-**root**, Twoje zwykłe konto użytkownika **nie dostaje automatycznie**
-uprawnień administratora. To normalne działanie Debiana, nie błąd i nie
-usterka tego instalatora. Zrób to raz, zanim uruchomisz cokolwiek innego —
-wykonuj polecenia dokładnie w tej kolejności:
+W poleceniach poniżej zamiast konkretnej nazwy jest `{user}`:
 
-1. Połącz się z serwerem (np. przez PuTTY) i zaloguj się jako swój zwykły
-   użytkownik.
-2. Przełącz się na konto root:
-   ```sh
-   su -
-   ```
-   Zapyta o hasło — podaj hasło **roota**, czyli to, które ustawiłeś
-   podczas instalacji Debiana (NIE hasło swojego zwykłego konta, jeśli są
-   różne). Prompt zmieni się na coś w stylu `root@nazwa-serwera:~#`.
-3. Zainstaluj `sudo` i dodaj do niego swojego użytkownika (**podmień
-   `twoja-nazwa` na swoją prawdziwą nazwę użytkownika**, tę której użyłeś
-   przy logowaniu w kroku 1):
-   ```sh
-   apt-get update
-   apt-get install -y sudo
-   usermod -aG sudo twoja-nazwa
-   ```
-4. Wyjdź z sesji roota:
-   ```sh
-   exit
-   ```
-5. **Zamknij całe okno PuTTY i połącz się jeszcze raz od nowa** (samo
-   `exit` nie wystarczy). To konieczne, żeby system zauważył nowe
-   uprawnienia — bez tego kroku `sudo` i tak zwróci błąd, że nie jesteś w
-   pliku sudoers.
-6. Po ponownym zalogowaniu sprawdź, czy `sudo` działa, i zainstaluj
-   `curl` (poda hasło swojego **zwykłego** użytkownika, nie roota):
-   ```sh
-   sudo apt-get install -y curl
-   ```
+> **{user} — twoja nazwa użytkownika** (ta, którą podałeś przy instalacji
+> Debiana i którą logujesz się do serwera, np. przez PuTTY).
 
-Dopiero teraz masz `curl` i działające `sudo` — możesz przejść do
-instalacji poniżej.
+Świeży Debian (netinst) **nie ma ani `curl`, ani `sudo`**, a jeśli przy
+instalacji Debiana ustawiłeś hasło dla konta **root**, Twoje konto nie ma
+jeszcze uprawnień administratora. To normalne działanie Debiana. Dlatego
+najpierw krótkie przygotowanie — polecenia wykonuj dokładnie w tej kolejności.
 
-## Użycie
+**1. Połącz się z serwerem** (np. przez PuTTY) i zaloguj się jako {user}.
+
+**2. Przełącz się na konto root** — zapyta o hasło **roota** (to z
+instalacji Debiana):
 
 ```sh
-# lokalnie, po pobraniu repo / pliku
-sudo ./install-myhome.sh
-# albo, po "su -":
-./install-myhome.sh
+su -
 ```
 
-**Z GitHuba** (publiczne, spoza sieci domowej), po wykonaniu kroków
-powyżej:
+**3. Zainstaluj sudo i curl, dodaj siebie do administratorów** (zamiast
+`{user}` wpisz swoją nazwę):
+
+```sh
+apt-get update
+apt-get install -y sudo curl
+usermod -aG sudo {user}
+exit
+```
+
+> ### ⛔ STOP — zamknij całe okno PuTTY i połącz się od nowa
+>
+> Samo `exit` nie wystarczy. Bez ponownego połączenia system nie widzi
+> nowych uprawnień i następny krok skończy się błędem
+> „{user} nie jest w pliku sudoers”.
+
+**4. Po ponownym zalogowaniu pobierz i uruchom instalator** — `sudo` zapyta
+o hasło Twojego konta ({user}), nie roota:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/if-faber/IF-home-server/main/install-myhome.sh -o install-myhome.sh
 sudo bash install-myhome.sh
 ```
+
+**5. Przejdź przez panel instalatora**: rola drukowania, sudo (z hasłem —
+zalecane — albo bez), hasło do udostępniania plików (Samba), podsumowanie.
+Na końcu instalator pokaże adres serwera i zaproponuje restart.
+
+## Pierwsze logowanie do paneli
+
+- **Cockpit** — `https://{adres-serwera}:9090`. Logujesz się kontem {user}
+  i hasłem z instalacji Debiana. Ostrzeżenie przeglądarki o certyfikacie jest
+  normalne („Zaawansowane → Przejdź”). Na górze widać „Dostęp
+  administracyjny” — to tryb ograniczony przy sudo z hasłem; pełne
+  uprawnienia włączasz kliknięciem i hasłem {user}.
+- **Dockge** — `http://{adres-serwera}:5001`. Dockge **nie zna** Twojego
+  konta z Debiana i nie pobierze go sam: przy pierwszym wejściu ręcznie
+  zakładasz osobne konto administratora Dockge (nazwa i hasło tylko do
+  Dockge). Konto zakłada ten, kto wejdzie pierwszy — zrób to od razu po
+  instalacji.
+- **Udostępnione foldery (Samba)** — w Windows wpisz w pasku Eksploratora
+  `\\{adres-serwera}` i zaloguj się jako {user} hasłem ustawionym w panelu
+  instalatora.
+
+> **{adres-serwera}** — adres IP serwera w Twojej sieci (pokazuje go
+> instalator na końcu; najlepiej zarezerwować go w routerze).
+
+Instalację z lokalnej kopii pliku też można uruchomić: `sudo ./install-myhome.sh`
+(albo `./install-myhome.sh` po `su -`).
 
 > Wewnętrzny adres LAN (Gitea) dla prac rozwojowych w sieci domowej nie
 > jest tu publikowany — kod na Gitea i GitHubie jest identyczny, więc do
@@ -94,7 +106,7 @@ sudo bash install-myhome.sh
 | `PRINT_SERVER_ROLE`  | `client`           | `client` instaluje tylko klienta CUPS (zakłada, że pełny serwer druku działa gdzie indziej w sieci). `server` instaluje pełny serwer CUPS — wybierz to, jeśli to Twój pierwszy serwer domowy i chcesz też hostować drukarki. |
 | `SUDO_MODE`          | `password`         | `password` — sudo pyta o hasło użytkownika (zalecane). `nopasswd` — sudo bez hasła (wygodniej, ale przejęcie konta = przejęcie serwera). W panelu graficznym wybierasz to przyciskiem. |
 
-Przykład: `TARGET_USER=darek PRINT_SERVER_ROLE=server sudo -E ./install-myhome.sh`
+Przykład: `TARGET_USER={user} PRINT_SERVER_ROLE=server sudo -E ./install-myhome.sh`
 
 ## Co instaluje skrypt (kolejność)
 
@@ -181,14 +193,14 @@ sudo chown -R $(whoami):$(whoami) ~/docker/app-data/<nazwa-uslugi>
 ```
 
 **3. W pliku `compose.yaml` używaj PEŁNYCH ścieżek zaczynających się od
-`/home/<Twoja-nazwa-użytkownika>/...`, a nie ścieżek względnych
+`/home/{user}/...`, a nie ścieżek względnych
 (`../../app-data/...`)**. Sprawdź swoją nazwę użytkownika i katalog domowy
 komendą `echo $HOME` (np. `/home/marek`) i wstaw ją bezpośrednio:
 
 ```yaml
     volumes:
-      - /home/TWOJA-NAZWA-UZYTKOWNIKA/docker/app-data/<nazwa-uslugi>/config:/app/config
-      - /home/TWOJA-NAZWA-UZYTKOWNIKA/docker/app-data/<nazwa-uslugi>/backups:/app/backups
+      - /home/{user}/docker/app-data/<nazwa-uslugi>/config:/app/config
+      - /home/{user}/docker/app-data/<nazwa-uslugi>/backups:/app/backups
 ```
 
 zamiast:
