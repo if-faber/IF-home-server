@@ -547,6 +547,11 @@ step "Cockpit i wtyczki"
 run "Instalacja Cockpit" apt install -y cockpit
 run "Włączenie cockpit.socket" systemctl enable --now cockpit.socket
 
+# Moduły dysków dla strony "Pamięć masowa" (test 11.10.2026): bez nich
+# Cockpit przy każdym wejściu na tę stronę próbuje je włączyć, dostaje błąd
+# i wyświetla czerwone "Ups!". Modułu iscsi Debian nie ma — w domu zbędny.
+run "Moduły dysków dla Cockpit (LVM, Btrfs)" apt install -y udisks2-lvm2 udisks2-btrfs
+
 run "Oficjalny dodatek: diagnostyka (sosreport)" apt install -y cockpit-sosreport
 
 # Wtyczki 45Drives (Navigator, File Sharing, Identities)
