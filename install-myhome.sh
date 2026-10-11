@@ -246,6 +246,20 @@ Wybierz 'Nie, tylko klient', jeśli chcesz tylko móc drukować na drukarce udos
     fi
     info "Rola drukowania: $PRINT_SERVER_ROLE"
 
+    # --- sudo z hasłem czy bez (zastępuje ręczne SUDO_MODE=...) ---
+    if whiptail --title "Uprawnienia administratora (sudo)" \
+        --yes-button "Z hasłem (zalecane)" --no-button "Bez hasła" \
+        --yesno "Czy przy poleceniach administratora (sudo) serwer ma pytać o hasło użytkownika '${TARGET_USER}'?
+
+Z hasłem (zalecane): ktoś, kto przejmie Twoje konto, nie dostanie od razu pełnej władzy nad serwerem.
+
+Bez hasła: wygodniej, ale przejęcie konta = przejęcie całego serwera." 16 70; then
+        SUDO_MODE="password"
+    else
+        SUDO_MODE="nopasswd"
+    fi
+    info "sudo: $SUDO_MODE"
+
     # --- Hasło do udostępniania plików w sieci (Samba) ---
     while true; do
         SMB_PASSWORD=$(whiptail --title "Udostępnianie plików w sieci" \
@@ -272,17 +286,19 @@ Będzie ono potrzebne na innych komputerach/urządzeniach w domu, żeby połącz
 
 Rola drukowania: $([ "$PRINT_SERVER_ROLE" = "server" ] && echo "serwer" || echo "tylko klient")
 Hasło do udostępniania plików: ustawione
+sudo: $([ "$SUDO_MODE" = "nopasswd" ] && echo "bez hasła" || echo "z hasłem")
 
 Rozpoczynamy właściwą instalację?"
     if ! whiptail --title "Instalator serwera domowego" \
         --yes-button "Tak, instaluj" --no-button "Anuluj" \
-        --yesno "$SUMMARY_MSG" 14 60; then
+        --yesno "$SUMMARY_MSG" 15 60; then
         echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"
         exit 0
     fi
 else
     warn "whiptail niedostępny albo brak terminala (np. uruchomienie przez 'curl | bash') — pomijam panel graficzny."
     PRINT_SERVER_ROLE="${PRINT_SERVER_ROLE:-client}"
+    SUDO_MODE="${SUDO_MODE:-password}"
     if [ -z "${SMB_PASSWORD-}" ]; then
         fail "brak panelu graficznego i brak zmiennej SMB_PASSWORD. Uruchom w prawdziwym terminalu (np. przez PuTTY), albo ustaw ręcznie: SMB_PASSWORD='...' TARGET_USER=... sudo -E $0"
     fi
@@ -297,10 +313,30 @@ step "sudo, curl, git, lsb-release"
 run "Aktualizacja listy pakietów" apt update
 run "Instalacja sudo/curl/git/lsb-release" apt install -y sudo curl git lsb-release
 
+# sudo: wybór instalującego (SUDO_MODE). Domyślnie Z HASŁEM (decyzja
+# 11.10.2026): kto przejmie konto, nie dostaje od razu roota.
+# "nopasswd" = świadomy wybór wygody (wpis w /etc/sudoers.d/<użytkownik>).
+SUDO_MODE="${SUDO_MODE:-password}"
+SUDOERS_FILE="/etc/sudoers.d/${TARGET_USER}"
+NOPASSWD_LINE="${TARGET_USER} ALL=(ALL) NOPASSWD: ALL"
 usermod -aG sudo "$TARGET_USER"
-echo "${TARGET_USER} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/${TARGET_USER}"
-chmod 0440 "/etc/sudoers.d/${TARGET_USER}"
-info "Dodano '${TARGET_USER}' do sudo (bez hasła)"
+if [ "$SUDO_MODE" = "nopasswd" ]; then
+    echo "$NOPASSWD_LINE" > "$SUDOERS_FILE"
+    chmod 0440 "$SUDOERS_FILE"
+    if ! visudo -cf "$SUDOERS_FILE" >>"$LOG_FILE" 2>&1; then
+        rm -f "$SUDOERS_FILE"
+        warn "Wpis sudo bez hasła był błędny — usunięty, zostaje sudo z hasłem"
+    else
+        info "Dodano '${TARGET_USER}' do sudo (BEZ hasła — wybór instalującego)"
+    fi
+else
+    # Przy reinstalacji usuwamy wpis bez hasła zostawiony przez starsze wersje.
+    if [ -f "$SUDOERS_FILE" ] && grep -qx "$NOPASSWD_LINE" "$SUDOERS_FILE"; then
+        rm -f "$SUDOERS_FILE"
+        info "Usunięto stary wpis sudo bez hasła"
+    fi
+    info "Dodano '${TARGET_USER}' do sudo (z hasłem użytkownika)"
+fi
 
 # ---------------------------------------------------------------------------
 # Krok 1: wyciszenie GRUB / boot bez opóźnień

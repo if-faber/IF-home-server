@@ -92,24 +92,34 @@ sudo bash install-myhome.sh
 |---------------------|--------------------|-----------|
 | `TARGET_USER`        | autodetekcja       | Użytkownik, dla którego konfigurowane są sudo/docker/samba/struktura katalogów. Autodetekcja: `$SUDO_USER` → `logname` → jedyne konto UID≥1000 w `/etc/passwd`. |
 | `PRINT_SERVER_ROLE`  | `client`           | `client` instaluje tylko klienta CUPS (zakłada, że pełny serwer druku działa gdzie indziej w sieci). `server` instaluje pełny serwer CUPS — wybierz to, jeśli to Twój pierwszy serwer domowy i chcesz też hostować drukarki. |
+| `SUDO_MODE`          | `password`         | `password` — sudo pyta o hasło użytkownika (zalecane). `nopasswd` — sudo bez hasła (wygodniej, ale przejęcie konta = przejęcie serwera). W panelu graficznym wybierasz to przyciskiem. |
 
 Przykład: `TARGET_USER=darek PRINT_SERVER_ROLE=server sudo -E ./install-myhome.sh`
 
 ## Co instaluje skrypt (kolejność)
 
-0. **sudo** dla wykrytego użytkownika (bez hasła), curl, git, lsb-release.
+0. **sudo** dla wykrytego użytkownika — do wyboru w panelu: z hasłem (domyślnie i zalecane: kto przejmie konto, nie dostaje od razu roota) albo bez hasła. Do tego curl, git, lsb-release.
 1. **Quiet boot** — wyciszenie GRUB-a i logów jądra na konsoli.
 2. **Pakiety systemowe** — SSH, avahi (mDNS/.local), smartmontools/lm-sensors/sysstat/htop (diagnostyka), CUPS (klient lub serwer, patrz `PRINT_SERVER_ROLE`), sane-utils, cifs-utils/nfs-common (NFS/CIFS), nodejs, python3-pip, python3-venv.
 3. **Docker + Docker Compose** (oficjalne repozytorium Dockera). Użytkownik docelowy dopisywany do grup `docker` (i `lpadmin`, jeśli istnieje — czyli tylko przy pełnym serwerze CUPS).
 4. **Struktura katalogów myhome** w katalogu domowym użytkownika (patrz niżej).
 5. **Dockge** — menedżer stosów Docker Compose, instalowany jako pierwszy stos i od razu uruchamiany (port 5001).
 6. **Samba** — instalacja, włączenie usług, ustawienie hasła sieciowego dla użytkownika (jedyny krok wymagający ręcznej interakcji).
-7. **Cockpit** + wtyczki (45Drives: Navigator, File Sharing, Identities; z GitHuba: Explorer, Docker Manager, Sensors, Compose, CTOP).
+7. **Cockpit** + wtyczki (45Drives: Navigator, File Sharing, Identities; z GitHuba: Explorer, Docker Manager, CTOP). Wtyczki Sensors i Compose są świadomie pominięte: Sensors pokazuje temperatury tylko w Fahrenheitach (CTOP pokazuje je w Celsjuszach), a Compose dubluje Dockge.
 8. **Cockpit PCP** — statystyki wydajności.
 9. **Wyłączenie zbędnych usług** (colord, nfs-blkmap).
 
 Cały surowy output komend trafia do `/var/log/myhome-install.log` — na
 ekranie widać tylko czyste, kolorowe statusy (`[n/10] ... OK`).
+
+### Źródła spoza Debiana — na co uważać
+
+Dwa źródła wtyczek Cockpit są szczególne: instalują paczki spoza oficjalnych repozytoriów Debiana z uprawnieniami roota.
+
+- **45Drives** (Navigator, File Sharing, Identities) — repozytorium dodawane skryptem `curl -sSL https://repo.45drives.com/setup | bash`. Skrypt z internetu dostaje uprawnienia roota. Ufamy mu, bo 45Drives to firma, która utrzymuje te wtyczki publicznie od lat.
+- **Docker Manager** (chrisjbawden/cockpit-dockermanager) — repozytorium APT oznaczone `[trusted=yes]`, czyli bez sprawdzania podpisu paczek.
+
+Jeśli któreś z tych źródeł zostałoby przejęte, przy instalacji lub aktualizacji mogłoby trafić na serwer coś innego niż wtyczka. Dlatego: przed instalacją sprawdź, czy projekty są nadal utrzymywane, a jeśli którejś wtyczki nie potrzebujesz, możesz ją pominąć.
 
 ## Struktura katalogów (`~/`)
 
