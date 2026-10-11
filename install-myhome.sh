@@ -262,13 +262,15 @@ Bez hasła: wygodniej, ale przejęcie konta = przejęcie całego serwera." 16 70
 
     # --- Hasło do udostępniania plików w sieci (Samba) ---
     while true; do
-        SMB_PASSWORD=$(whiptail --title "Udostępnianie plików w sieci" \
+        SMB_PASSWORD=$(whiptail --title "Udostępnianie plików w sieci (Samba)" \
             --passwordbox "Ustaw hasło do udostępniania plików w sieci dla użytkownika '${TARGET_USER}'.
 
-Będzie ono potrzebne na innych komputerach/urządzeniach w domu, żeby połączyć się z udostępnionymi folderami." \
-            13 70 3>&1 1>&2 2>&3) || { echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"; exit 0; }
+Będzie ono potrzebne na innych komputerach/urządzeniach w domu, żeby połączyć się z udostępnionymi folderami.
 
-        SMB_PASSWORD_REPEAT=$(whiptail --title "Udostępnianie plików w sieci" \
+Program, który to obsługuje, nazywa się Samba — to standardowy sposób udostępniania folderów w sieci domowej (w Windows widoczny w Eksploratorze w zakładce Sieć)." \
+            16 70 3>&1 1>&2 2>&3) || { echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"; exit 0; }
+
+        SMB_PASSWORD_REPEAT=$(whiptail --title "Udostępnianie plików w sieci (Samba)" \
             --passwordbox "Wpisz hasło jeszcze raz, żeby je potwierdzić." \
             10 70 3>&1 1>&2 2>&3) || { echo "Instalacja anulowana przez użytkownika." | tee -a "$LOG_FILE"; exit 0; }
 
@@ -276,7 +278,7 @@ Będzie ono potrzebne na innych komputerach/urządzeniach w domu, żeby połącz
             unset SMB_PASSWORD_REPEAT
             break
         fi
-        whiptail --title "Udostępnianie plików w sieci" \
+        whiptail --title "Udostępnianie plików w sieci (Samba)" \
             --msgbox "Hasła się różnią albo pole było puste — spróbuj ponownie." 8 60
     done
     info "Hasło Samby ustawione (zostanie użyte w Kroku 6)."
@@ -285,7 +287,7 @@ Będzie ono potrzebne na innych komputerach/urządzeniach w domu, żeby połącz
     SUMMARY_MSG="Gotowe do instalacji.
 
 Rola drukowania: $([ "$PRINT_SERVER_ROLE" = "server" ] && echo "serwer" || echo "tylko klient")
-Hasło do udostępniania plików: ustawione
+Hasło do udostępniania plików (Samba): ustawione
 sudo: $([ "$SUDO_MODE" = "nopasswd" ] && echo "bez hasła" || echo "z hasłem")
 
 Rozpoczynamy właściwą instalację?"
