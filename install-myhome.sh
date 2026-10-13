@@ -65,7 +65,7 @@ else
     BOLD=""; RESET=""; GREEN=""; RED=""; YELLOW=""; CYAN=""
 fi
 
-TOTAL_STEPS=10
+TOTAL_STEPS=11
 STEP_NUM=0
 
 step() {
@@ -365,6 +365,8 @@ step "Pakiety systemowe"
 
 run "SSH i mDNS (.local)" apt install -y openssh-server avahi-daemon
 run "Diagnostyka sprzętu (smartmontools, lm-sensors...)" apt install -y smartmontools lm-sensors sysstat htop
+# ShellCheck — sprawdzanie skryptów (zasada projektu: każdy skrypt sprawdzony przed oddaniem).
+run "Sprawdzanie skryptów (shellcheck)" apt install -y shellcheck
 
 # Domyślnie tylko KLIENT druku — zakłada, że pełny serwer wydruku (CUPS)
 # działa już gdzie indziej w sieci (tak jak u mnie). Jeśli to Twój PIERWSZY
@@ -618,6 +620,119 @@ info "Wyłączono i zamaskowano colord"
 systemctl disable --now nfs-blkmap.service >>"$LOG_FILE" 2>&1 || true
 systemctl mask nfs-blkmap.service >>"$LOG_FILE" 2>&1
 info "Wyłączono i zamaskowano nfs-blkmap"
+
+# ---------------------------------------------------------------------------
+# Krok 11: narzędzia dla strony startowej IF-startpage
+# ---------------------------------------------------------------------------
+# Kontener IF-startpage nie widzi pakietów serwera. Serwer raz dziennie zapisuje
+# listę oczekujących aktualizacji Debiana do folderu danych IF-startpage, a strona
+# ją pokazuje (Zaplecze → Aktualizacje, dzwonek). Instalacja aktualizacji — w Cockpit.
+# Dopóki IF-startpage nie jest zainstalowany (brak folderu config), zadanie nic nie
+# zapisuje — stronę można doinstalować później, nic nie trzeba poprawiać.
+# Skrypt to KOPIA z repozytorium IF-startpage: extras/system-updates/if-system-updates
+# (zmiany wprowadzamy w obu miejscach naraz).
+step "Narzędzia dla strony startowej (IF-startpage)"
+
+IFSTARTPAGE_UPDATES_FILE="${USER_HOME}/docker/app-data/if-startpage/config/system-updates.json"
+
+cat > /usr/local/bin/if-system-updates <<'IFSTARTPAGE_SCRIPT'
+#!/usr/bin/env bash
+# if-system-updates — zapisuje listę oczekujących aktualizacji Debiana dla IF-startpage.
+#
+# Kontener IF-startpage nie widzi pakietów serwera, dlatego to serwer raz dziennie
+# (zadanie systemd if-system-updates.timer) zapisuje listę do pliku w folderze danych
+# IF-startpage, a strona tylko ją pokazuje. Instalacja aktualizacji — w Cockpit.
+#
+# Użycie (jako root):
+#   if-system-updates /home/{user}/docker/app-data/if-startpage/config/system-updates.json [kolejny plik ...]
+#   {user} — twoja nazwa użytkownika
+#
+# Wynik (JSON):
+#   {"checkedAt":"2026-10-13T14:00:00+02:00","packages":[
+#     {"name":"openssl","current":"3.5.1-1","available":"3.5.4-1","security":true}, ...]}
+
+set -euo pipefail
+
+if [ "$#" -lt 1 ]; then
+  echo "Użycie: $0 /home/{user}/docker/app-data/if-startpage/config/system-updates.json [kolejny plik ...]" >&2
+  exit 2
+fi
+
+# Odświeżenie listy pakietów; błąd sieci nie przerywa — zapiszemy to, co apt już wie.
+apt-get update -qq >/dev/null 2>&1 || true
+
+json="$(
+  printf '{"checkedAt":"%s","packages":[' "$(date -Iseconds)"
+  first=1
+  # Linia: nazwa/źródło wersja architektura [upgradable from: stara-wersja]
+  while IFS= read -r line; do
+    [[ "$line" == *"[upgradable from:"* ]] || continue
+    name="${line%%/*}"
+    rest="${line#*/}"
+    suite="${rest%% *}"
+    rest="${rest#* }"
+    available="${rest%% *}"
+    current="${line##*upgradable from: }"
+    current="${current%]}"
+    security=false
+    if [[ "$suite" == *security* ]]; then security=true; fi
+    if [ "$first" -eq 0 ]; then printf ','; fi
+    first=0
+    # Nazwy i wersje pakietów Debiana mają tylko bezpieczne znaki (litery, cyfry, . + - : ~).
+    printf '{"name":"%s","current":"%s","available":"%s","security":%s}' "$name" "$current" "$available" "$security"
+  done < <(LC_ALL=C apt list --upgradable 2>/dev/null)
+  printf ']}\n'
+)"
+
+for out in "$@"; do
+  dir="$(dirname "$out")"
+  if [ ! -d "$dir" ]; then
+    echo "Pomijam $out — nie ma folderu $dir" >&2
+    continue
+  fi
+  # Zapis przez plik tymczasowy w tym samym folderze — strona nigdy nie widzi połowy pliku.
+  tmp="$(mktemp "$out.XXXXXX")"
+  printf '%s' "$json" > "$tmp"
+  chmod 644 "$tmp"
+  # Właściciel jak folderu (np. twój użytkownik, nie root).
+  chown --reference="$dir" "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$out"
+done
+IFSTARTPAGE_SCRIPT
+chmod 755 /usr/local/bin/if-system-updates
+info "Skrypt /usr/local/bin/if-system-updates"
+
+cat > /etc/systemd/system/if-system-updates.service <<IFSTARTPAGE_SERVICE
+[Unit]
+Description=IF-startpage: lista oczekujących aktualizacji Debiana
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/if-system-updates ${IFSTARTPAGE_UPDATES_FILE}
+Nice=10
+IOSchedulingClass=idle
+IFSTARTPAGE_SERVICE
+
+cat > /etc/systemd/system/if-system-updates.timer <<'IFSTARTPAGE_TIMER'
+[Unit]
+Description=IF-startpage: sprawdzanie aktualizacji Debiana raz dziennie
+
+[Timer]
+OnBootSec=10min
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+IFSTARTPAGE_TIMER
+chmod 644 /etc/systemd/system/if-system-updates.service /etc/systemd/system/if-system-updates.timer
+
+run "Przeładowanie systemd" systemctl daemon-reload
+run "Sprawdzanie aktualizacji raz dziennie (if-system-updates.timer)" systemctl enable --now if-system-updates.timer
+info "Lista aktualizacji trafi do: ${IFSTARTPAGE_UPDATES_FILE} (gdy IF-startpage będzie zainstalowany)"
 
 # ---------------------------------------------------------------------------
 printf "\n%s%s=== myhome install: koniec %s ===%s\n" "$GREEN" "$BOLD" "$(date '+%Y-%m-%d %H:%M:%S')" "$RESET"

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# if-system-updates — zapisuje listę oczekujących aktualizacji Debiana dla IF-startpage.
+#
+# Kontener IF-startpage nie widzi pakietów serwera, dlatego to serwer raz dziennie
+# (zadanie systemd if-system-updates.timer) zapisuje listę do pliku w folderze danych
+# IF-startpage, a strona tylko ją pokazuje. Instalacja aktualizacji — w Cockpit.
+#
+# Użycie (jako root):
+#   if-system-updates /home/{user}/docker/app-data/if-startpage/config/system-updates.json [kolejny plik ...]
+#   {user} — twoja nazwa użytkownika
+#
+# Wynik (JSON):
+#   {"checkedAt":"2026-10-13T14:00:00+02:00","packages":[
+#     {"name":"openssl","current":"3.5.1-1","available":"3.5.4-1","security":true}, ...]}
+
+set -euo pipefail
+
+if [ "$#" -lt 1 ]; then
+  echo "Użycie: $0 /home/{user}/docker/app-data/if-startpage/config/system-updates.json [kolejny plik ...]" >&2
+  exit 2
+fi
+
+# Odświeżenie listy pakietów; błąd sieci nie przerywa — zapiszemy to, co apt już wie.
+apt-get update -qq >/dev/null 2>&1 || true
+
+json="$(
+  printf '{"checkedAt":"%s","packages":[' "$(date -Iseconds)"
+  first=1
+  # Linia: nazwa/źródło wersja architektura [upgradable from: stara-wersja]
+  while IFS= read -r line; do
+    [[ "$line" == *"[upgradable from:"* ]] || continue
+    name="${line%%/*}"
+    rest="${line#*/}"
+    suite="${rest%% *}"
+    rest="${rest#* }"
+    available="${rest%% *}"
+    current="${line##*upgradable from: }"
+    current="${current%]}"
+    security=false
+    if [[ "$suite" == *security* ]]; then security=true; fi
+    if [ "$first" -eq 0 ]; then printf ','; fi
+    first=0
+    # Nazwy i wersje pakietów Debiana mają tylko bezpieczne znaki (litery, cyfry, . + - : ~).
+    printf '{"name":"%s","current":"%s","available":"%s","security":%s}' "$name" "$current" "$available" "$security"
+  done < <(LC_ALL=C apt list --upgradable 2>/dev/null)
+  printf ']}\n'
+)"
+
+for out in "$@"; do
+  dir="$(dirname "$out")"
+  if [ ! -d "$dir" ]; then
+    echo "Pomijam $out — nie ma folderu $dir" >&2
+    continue
+  fi
+  # Zapis przez plik tymczasowy w tym samym folderze — strona nigdy nie widzi połowy pliku.
+  tmp="$(mktemp "$out.XXXXXX")"
+  printf '%s' "$json" > "$tmp"
+  chmod 644 "$tmp"
+  # Właściciel jak folderu (np. twój użytkownik, nie root).
+  chown --reference="$dir" "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$out"
+done

@@ -1,0 +1,12 @@
+[Unit]
+Description=IF-startpage: sprawdzanie aktualizacji Debiana raz dziennie
+
+[Timer]
+# 10 minut po starcie serwera i potem raz dziennie (losowo w ciągu godziny, żeby nie obciążać serwerów Debiana naraz).
+OnBootSec=10min
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

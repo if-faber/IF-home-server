@@ -1,0 +1,11 @@
+[Unit]
+Description=IF-startpage: lista oczekujących aktualizacji Debiana
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# {user} — twoja nazwa użytkownika. Kolejne pliki (np. wersja testowa) dopisz po spacji.
+ExecStart=/usr/local/bin/if-system-updates /home/{user}/docker/app-data/if-startpage/config/system-updates.json
+Nice=10
+IOSchedulingClass=idle
