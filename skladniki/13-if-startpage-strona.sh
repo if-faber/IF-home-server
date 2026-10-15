@@ -5,9 +5,11 @@
 # wpisujemy ścieżki użytkownika i PIN. Kolejne wersje strony instaluje się już z jej
 # Zaplecza (Aktualizacje) i w Dockge. Istniejącego compose.yaml nie nadpisujemy.
 NAZWA="IF-startpage (strona startowa)"
-WERSJA=1
+# WERSJA 2: strona v0.1.7.2 i od razu lista aktualizacji Debiana (wcześniej zadanie z listą
+# pomijało zapis, bo folder strony powstawał dopiero tutaj — lista była dopiero w nocy).
+WERSJA=2
 
-IFSTARTPAGE_TAG="v0.1.7.1"
+IFSTARTPAGE_TAG="v0.1.7.2"
 IFSTARTPAGE_COMPOSE_URL="https://raw.githubusercontent.com/if-faber/if-startpage/${IFSTARTPAGE_TAG}/compose.yaml"
 
 ifstartpage_compose() {
@@ -75,5 +77,9 @@ zainstaluj() {
     mkdir -p "${data}/config" "${data}/backups" "${data}/icons"
     chown -R "${TARGET_USER}:${TARGET_USER}" "$dir" "$data"
     run "Uruchomienie IF-startpage" docker compose -f "$compose" up -d
+    # Lista aktualizacji Debiana od razu (zadanie z „Narzędzi dla IF-startpage”, jeśli jest).
+    if systemctl cat if-system-updates.service >/dev/null 2>&1; then
+        run "Lista aktualizacji Debiana dla strony" systemctl start --no-block if-system-updates.service
+    fi
     info "Strona startowa: http://<adres-serwera> (Zaplecze — PIN z instalacji)"
 }
