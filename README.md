@@ -34,6 +34,7 @@ na serwerze** (podobnie jak KIAUH dla Klippera).
 | Wykresy w Cockpit | PCP — historia obciążenia |
 | Wyłączenie zbędnych usług | colord, nfs-blkmap |
 | Narzędzia dla IF-startpage | ShellCheck, lista aktualizacji Debiana dla strony startowej (codziennie i od razu po każdej aktualizacji) |
+| IF-startpage (strona startowa) | panel serwera w przeglądarce (`http://<adres-serwera>`), stos w Dockge, wersja v0.1.7.1 |
 
 Wtyczki 45Drives i Docker Manager pochodzą spoza repozytoriów Debiana (45Drives — skrypt
 `curl | bash` z uprawnieniami roota, Docker Manager — repozytorium bez sprawdzania podpisu).
