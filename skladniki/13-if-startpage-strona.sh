@@ -7,7 +7,9 @@
 NAZWA="IF-startpage (strona startowa)"
 # WERSJA 2: strona v0.1.7.2 i od razu lista aktualizacji Debiana (wcześniej zadanie z listą
 # pomijało zapis, bo folder strony powstawał dopiero tutaj — lista była dopiero w nocy).
-WERSJA=2
+# WERSJA 3: strona rozpoznawana po kontenerze if-startpage — także postawiona wcześniej ręcznie
+# w Dockge (inny folder lub nazwa pliku compose); wtedy niczego nie instalujemy.
+WERSJA=3
 
 IFSTARTPAGE_TAG="v0.1.7.2"
 IFSTARTPAGE_COMPOSE_URL="https://raw.githubusercontent.com/if-faber/if-startpage/${IFSTARTPAGE_TAG}/compose.yaml"
@@ -16,7 +18,17 @@ ifstartpage_compose() {
     printf '%s\n' "${USER_HOME}/docker/app/if-startpage/compose.yaml"
 }
 
+# Kontener if-startpage już jest (niezależnie od tego, skąd go postawiono).
+ifstartpage_kontener_jest() {
+    docker inspect if-startpage >/dev/null 2>&1
+}
+
 sprawdz() {
+    if ifstartpage_kontener_jest && [ ! -f "$(ifstartpage_compose)" ]; then
+        [ "$(docker inspect -f '{{.State.Running}}' if-startpage 2>/dev/null)" = "true" ] \
+            || echo "działający kontener if-startpage"
+        return 0
+    fi
     [ -f "$(ifstartpage_compose)" ] || return 1
     [ "$(docker inspect -f '{{.State.Running}}' if-startpage 2>/dev/null)" = "true" ] \
         || echo "działający kontener if-startpage"
@@ -26,6 +38,7 @@ pytania() {
     local pin1 pin2
     # Strona już jest — PIN zmienia się w jej Zapleczu, nie pytamy.
     [ -f "$(ifstartpage_compose)" ] && return 0
+    ifstartpage_kontener_jest && return 0
     while true; do
         pin1=$(whiptail --title "Strona startowa (IF-startpage)" \
             --passwordbox "Ustaw PIN do Zaplecza strony startowej (4–8 cyfr).
@@ -50,6 +63,15 @@ zainstaluj() {
     compose="$(ifstartpage_compose)"
     dir="$(dirname "$compose")"
     data="${USER_HOME}/docker/app-data/if-startpage"
+
+    # Strona postawiona wcześniej ręcznie (w innym miejscu) — zostawiamy ją, tylko lista Debiana.
+    if [ ! -f "$compose" ] && ifstartpage_kontener_jest; then
+        info "Strona startowa już działa (stos: $(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' if-startpage 2>/dev/null)) — zostawiam bez zmian"
+        if systemctl cat if-system-updates.service >/dev/null 2>&1; then
+            run "Lista aktualizacji Debiana dla strony" systemctl start --no-block if-system-updates.service
+        fi
+        return 0
+    fi
 
     if [ ! -f "$compose" ]; then
         # Port 80 zajęty przez coś innego — nie uruchomimy strony obok.
