@@ -12,11 +12,17 @@
 #                ekran — tam rysują się okna whiptail). Kod różny od 0 = anulowano.
 #   zainstaluj — instaluje albo uzupełnia składnik (polecenia przez run/run_sh).
 NAZWA="Podstawy systemu"
-WERSJA=1
+# WERSJA 2: serwer nigdy sam nie zasypia (uśpienie i hibernacja wyłączone, zamknięcie
+# klapy laptopa nic nie robi) — 15.10.2026 testowy serwer zahibernował się w trakcie instalacji.
+WERSJA=2
+
+LOGIND_IF=/etc/systemd/logind.conf.d/if-server.conf
 
 sprawdz() {
     pakiet_jest sudo || return 1
     brak_pakietow curl git lsb-release
+    [ "$(systemctl is-enabled sleep.target 2>/dev/null)" = "masked" ] && [ -f "$LOGIND_IF" ] \
+        || echo "serwer nie zasypia (uśpienie i hibernacja wyłączone)"
 }
 
 pytania() {
@@ -59,4 +65,14 @@ zainstaluj() {
         fi
         info "'${TARGET_USER}' w sudo (z hasłem użytkownika)"
     fi
+
+    # Serwer ma działać cały czas: bez uśpienia i hibernacji (także po zamknięciu klapy).
+    run "Wyłączenie uśpienia i hibernacji" \
+        systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+    install -m 0755 -d "$(dirname "$LOGIND_IF")"
+    printf '%s\n' "# if-server: serwer nie zasypia (klapa laptopa, bezczynność)" "[Login]" \
+        "HandleLidSwitch=ignore" "HandleLidSwitchExternalPower=ignore" "HandleLidSwitchDocked=ignore" \
+        "HandleSuspendKey=ignore" "HandleHibernateKey=ignore" "IdleAction=ignore" > "$LOGIND_IF"
+    chmod 644 "$LOGIND_IF"
+    info "Ustawienia klapy i bezczynności zadziałają po najbliższym ponownym uruchomieniu"
 }

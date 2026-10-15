@@ -418,6 +418,28 @@ else
     info "Dodano '${TARGET_USER}' do grupy docker (lpadmin pominięte — brak pełnego serwera CUPS)"
 fi
 
+# Serwer nie zasypia (jak składnik Podstawy systemu w if-server, WERSJA 2).
+run "Wyłączenie uśpienia i hibernacji" systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+install -m 0755 -d /etc/systemd/logind.conf.d
+printf '%s\n' "# if-server: serwer nie zasypia (klapa laptopa, bezczynność)" "[Login]" \
+    "HandleLidSwitch=ignore" "HandleLidSwitchExternalPower=ignore" "HandleLidSwitchDocked=ignore" \
+    "HandleSuspendKey=ignore" "HandleHibernateKey=ignore" "IdleAction=ignore" > /etc/systemd/logind.conf.d/if-server.conf
+
+# Stałe serwery DNS dla aplikacji (jak składnik Docker w if-server, WERSJA 2): bez tego po
+# restarcie Docker potrafi uruchomić aplikacje, zanim serwer dostanie DNS od routera.
+if ! grep -qs '"dns"' /etc/docker/daemon.json && [ ! -f /etc/docker/daemon.json ]; then
+    DOCKER_DNS=""
+    while IFS= read -r adres; do
+        DOCKER_DNS="${DOCKER_DNS}\"${adres}\", "
+    done < <(awk '$1 == "nameserver" && $2 !~ /^127\./ && $2 != "::1" && $2 !~ /%/ { print $2 }' /etc/resolv.conf | head -n 3)
+    if [ -n "$DOCKER_DNS" ]; then
+        install -m 0755 -d /etc/docker
+        printf '{ "dns": [%s] }\n' "${DOCKER_DNS%, }" > /etc/docker/daemon.json
+        chmod 644 /etc/docker/daemon.json
+        run "Ponowne uruchomienie Dockera (stałe DNS dla aplikacji)" systemctl restart docker
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # Krok 4: struktura katalogów myhome w katalogu domowym użytkownika
 # ---------------------------------------------------------------------------
