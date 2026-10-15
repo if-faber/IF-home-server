@@ -33,7 +33,7 @@ na serwerze** (podobnie jak KIAUH dla Klippera).
 | Cockpit i wtyczki | panel serwera (port 9090), moduły dysków, sosreport, 45Drives (Navigator, File Sharing, Identities), Explorer, Docker Manager, CTOP |
 | Wykresy w Cockpit | PCP — historia obciążenia |
 | Wyłączenie zbędnych usług | colord, nfs-blkmap |
-| Narzędzia dla IF-startpage | ShellCheck, codzienna lista aktualizacji Debiana dla strony startowej |
+| Narzędzia dla IF-startpage | ShellCheck, lista aktualizacji Debiana dla strony startowej (codziennie i od razu po każdej aktualizacji) |
 
 Wtyczki 45Drives i Docker Manager pochodzą spoza repozytoriów Debiana (45Drives — skrypt
 `curl | bash` z uprawnieniami roota, Docker Manager — repozytorium bez sprawdzania podpisu).

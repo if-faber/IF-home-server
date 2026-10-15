@@ -730,6 +730,17 @@ WantedBy=timers.target
 IFSTARTPAGE_TIMER
 chmod 644 /etc/systemd/system/if-system-updates.service /etc/systemd/system/if-system-updates.timer
 
+# Po każdej instalacji / aktualizacji pakietów (apt, Cockpit) lista odświeża się od razu.
+# KOPIA z repozytorium IF-startpage: extras/system-updates/99if-system-updates
+cat > /etc/apt/apt.conf.d/99if-system-updates <<'IFSTARTPAGE_APT'
+// IF-startpage: po każdej instalacji lub aktualizacji pakietów (apt, Cockpit) od razu odśwież
+// listę oczekujących aktualizacji Debiana — bez czekania na zadanie raz dziennie.
+// Plik trafia do /etc/apt/apt.conf.d/99if-system-updates. Zadanie startuje w tle (--no-block),
+// więc nie wydłuża instalacji; gdy systemd albo zadania nie ma, nic się nie dzieje.
+DPkg::Post-Invoke { "if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then systemctl start --no-block if-system-updates.service >/dev/null 2>&1 || true; fi"; };
+IFSTARTPAGE_APT
+chmod 644 /etc/apt/apt.conf.d/99if-system-updates
+
 run "Przeładowanie systemd" systemctl daemon-reload
 run "Sprawdzanie aktualizacji raz dziennie (if-system-updates.timer)" systemctl enable --now if-system-updates.timer
 info "Lista aktualizacji trafi do: ${IFSTARTPAGE_UPDATES_FILE} (gdy IF-startpage będzie zainstalowany)"
