@@ -5,10 +5,10 @@
 #
 # Kontener IF-startpage nie widzi pakietów serwera. Serwer raz dziennie zapisuje
 # listę oczekujących aktualizacji do folderu danych IF-startpage, a strona ją
-# pokazuje. Pliki w skladniki/pliki/if-startpage/ to KOPIA z repozytorium
-# IF-startpage (extras/system-updates/) — zmiany wprowadzamy w obu miejscach.
+# pokazuje. Pliki: strona/extras/system-updates/ (strona jest częścią tego repozytorium).
 NAZWA="Narzędzia dla IF-startpage"
-WERSJA=2
+# WERSJA 3: skrypt zapisuje też wersję if-server (strona pokazuje ją w Aktualizacjach).
+WERSJA=3
 
 sprawdz() {
     local brak
@@ -20,11 +20,16 @@ sprawdz() {
         [ -f /etc/apt/apt.conf.d/99if-system-updates ] || echo "odświeżanie listy po aktualizacji (apt)"
     )"
     [ "$(printf '%s\n' "$brak" | grep -c .)" -lt 4 ] || return 1
+    if [ -x /usr/local/bin/if-system-updates ] \
+        && ! cmp -s "$APP_DIR/strona/extras/system-updates/if-system-updates" /usr/local/bin/if-system-updates; then
+        brak="${brak:+$brak
+}nowa wersja zadania if-system-updates"
+    fi
     [ -z "$brak" ] || printf '%s\n' "$brak"
 }
 
 zainstaluj() {
-    local src="$COMPONENTS_DIR/pliki/if-startpage"
+    local src="$APP_DIR/strona/extras/system-updates"
     local service=/etc/systemd/system/if-system-updates.service
 
     run "Sprawdzanie skryptów (shellcheck)" apt-get install -y shellcheck
@@ -44,5 +49,7 @@ zainstaluj() {
     run "Przeładowanie systemd" systemctl daemon-reload
     run "Sprawdzanie aktualizacji raz dziennie (if-system-updates.timer)" \
         systemctl enable --now if-system-updates.timer
+    # Lista (i wersja serwera) od razu, nie dopiero w nocy — gdy strona już jest.
+    run "Lista aktualizacji Debiana dla strony" systemctl start --no-block if-system-updates.service
     info "Lista aktualizacji trafi do: ${USER_HOME}/docker/app-data/if-startpage/config/system-updates.json"
 }

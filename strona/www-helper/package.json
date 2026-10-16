@@ -1,0 +1,15 @@
+{
+  "name": "if-startpage-helper",
+  "version": "1.0.0",
+  "description": "Backend API IF-startpage (Idea Forge)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

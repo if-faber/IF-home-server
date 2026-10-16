@@ -1,0 +1,263 @@
+﻿:root {
+  color-scheme: dark;
+  --bg: #060a0f;
+  --panel: rgb(9 16 23 / 0.92);
+  --line: rgb(255 255 255 / 0.13);
+  --text: #f3fbfd;
+  --muted: #9aaab8;
+  --green: #55f0b2;
+  --blue: #4da3ff;
+  --red: #ff5b6c;
+  --yellow: #ffd166;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 16% 14%, rgb(85 240 178 / 0.18), transparent 30%),
+    radial-gradient(circle at 82% 8%, rgb(77 163 255 / 0.18), transparent 28%),
+    linear-gradient(145deg, #04070b 0%, #07131a 48%, #090b12 100%);
+  color: var(--text);
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.radio-view {
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100svh;
+  padding: clamp(8px, 2vw, 18px);
+  overflow: hidden;
+}
+
+.radio-panel {
+  display: grid;
+  grid-template-rows: auto minmax(48px, 0.48fr) auto auto;
+  gap: clamp(8px, 1.5vh, 14px);
+  width: min(980px, 100%);
+  height: min(720px, 100%);
+  max-height: calc(100svh - 16px);
+  padding: clamp(10px, 2.2vw, 20px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.36);
+  overflow: hidden;
+}
+
+.radio-display {
+  display: grid;
+  align-content: center;
+  min-height: clamp(88px, 20vh, 148px);
+  padding: clamp(12px, 2.4vw, 22px);
+  border: 1px solid rgb(85 240 178 / 0.2);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgb(85 240 178 / 0.12), rgb(77 163 255 / 0.08)),
+    rgb(0 0 0 / 0.28);
+  text-align: center;
+}
+
+.radio-display span {
+  color: var(--green);
+  font-size: clamp(12px, 1.8vw, 15px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.radio-display strong {
+  margin-top: 5px;
+  font-size: clamp(28px, 6vw, 60px);
+  line-height: 1;
+}
+
+.radio-display small {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: clamp(13px, 2vw, 17px);
+}
+
+.spectrum {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(5px, 1fr));
+  align-items: end;
+  gap: clamp(4px, 1vw, 9px);
+  min-height: 48px;
+  padding: 8px 6px;
+  overflow: hidden;
+}
+
+.spectrum span {
+  height: 24%;
+  min-height: 12px;
+  border-radius: 999px 999px 4px 4px;
+  background: linear-gradient(180deg, var(--green), var(--blue));
+  opacity: 0.5;
+}
+
+.spectrum span:nth-child(3n) {
+  height: 46%;
+}
+
+.spectrum span:nth-child(4n) {
+  height: 64%;
+}
+
+.spectrum.is-playing span {
+  animation: pulse 0.7s ease-in-out infinite alternate;
+  opacity: 0.95;
+}
+
+.spectrum.is-playing span:nth-child(2n) {
+  animation-duration: 0.52s;
+}
+
+.spectrum.is-playing span:nth-child(3n) {
+  animation-duration: 0.9s;
+}
+
+.station-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(8px, 1.8vw, 14px);
+}
+
+.station-card {
+  display: grid;
+  grid-template-columns: minmax(46px, 64px) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: clamp(70px, 13vh, 104px);
+  padding: clamp(9px, 1.6vw, 14px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.07);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.station-card.is-active {
+  border-color: rgb(85 240 178 / 0.62);
+  background: rgb(85 240 178 / 0.14);
+}
+
+.station-logo {
+  display: grid;
+  place-items: center;
+  width: clamp(46px, 8vw, 64px);
+  height: clamp(46px, 8vw, 64px);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.08);
+  color: var(--green);
+  font-weight: 900;
+}
+
+.station-logo img {
+  display: block;
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+}
+
+.station-card strong {
+  overflow: hidden;
+  font-size: clamp(18px, 3vw, 28px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radio-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: 54px;
+}
+
+.radio-controls button {
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: clamp(16px, 2.4vw, 22px);
+  font-weight: 800;
+}
+
+.primary-action {
+  background: linear-gradient(135deg, rgb(85 240 178 / 0.95), rgb(77 163 255 / 0.95));
+  color: #041014;
+}
+
+.ghost-action {
+  background: rgb(255 255 255 / 0.08);
+}
+
+@keyframes pulse {
+  from {
+    transform: scaleY(0.42);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .station-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 620px) {
+  .radio-view {
+    padding: 6px;
+  }
+
+  .radio-panel {
+    grid-template-rows: auto 42px auto 48px;
+    gap: 7px;
+    max-height: calc(100svh - 12px);
+    padding: 8px;
+    border-radius: 14px;
+  }
+
+  .radio-display {
+    min-height: 78px;
+    padding: 10px;
+  }
+
+  .radio-display small {
+    margin-top: 4px;
+  }
+
+  .station-card {
+    min-height: 58px;
+    border-radius: 12px;
+  }
+
+  .station-logo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .radio-controls,
+  .radio-controls button {
+    min-height: 48px;
+  }
+}

@@ -1,0 +1,679 @@
+/* ==========================================================================
+   Autorski Moduł Zaplecza IF-startpage: www/mods/admin/admin.css
+   Glassmorphism Admin Dashboard Theme & Components
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   WYGLĄD STARTOWY ZAPLECZA — jedyne źródło wartości domyślnych.
+   Edytor „Wygląd Zaplecza” czyta te wartości do formularza, więc dotknięcie
+   kontrolki nie zmienia niczego poza tą jedną właściwością.
+   -------------------------------------------------------------------------- */
+body.admin-body {
+  --admin-panel-rgb: 18 30 36;
+  --admin-panel-alpha: 0.72;
+  --admin-sidebar-rgb: 11 19 23;
+  --admin-sidebar-alpha: 0.88;
+  --admin-sidebar-width: 270px;
+  --admin-menu-text-color: #cbd5e1;
+  --admin-menu-btn-bg: #0b1317;
+  --admin-menu-btn-text: #cbd5e1;
+  --admin-menu-btn-hover-bg: #16262c;
+  --admin-menu-btn-hover-text: #54ffb2;
+  --admin-menu-btn-active-bg: #133b2f;
+  --admin-menu-btn-active-text: #54ffb2;
+  --card-radius: 16px;
+  --card-gap: 20px;
+  --btn-radius: 10px;
+  --btn-glow: 12px;
+  --btn-glow-color: #54ffb2;
+  --btn-border-width: 1px;
+  --btn-border-color: #2a3b42;
+  --btn-normal-bg: #54ffb2;
+  --btn-normal-text: #052016;
+  --btn-normal-hover-bg: #7dffc6;
+  --btn-normal-hover-text: #052016;
+  --btn-danger-bg: #3a1518;
+  --btn-danger-text: #fca5a5;
+  --btn-danger-hover-bg: #5a1d22;
+  --btn-danger-hover-text: #ffffff;
+  --btn-danger-glow-color: #ef4444;
+}
+
+/* --------------------------------------------------------------------------
+   WYGLĄD STARTOWY ZAPLECZA — TRYB DZIEŃ (html[data-mode="d"]).
+   Kolory jak w trybie dziennym Strony Głównej. Zmiany z edytora „Wygląd
+   Zaplecza” zapisują się osobno dla dnia i nocy i nadpisują te wartości.
+   -------------------------------------------------------------------------- */
+html[data-mode="d"] body.admin-body {
+  color-scheme: light;
+  --text: #15232b;
+  --muted: #5d6e78;
+  --bg: #eef2f5;
+  --page-bg: #eef2f5;
+  --surface-base-rgb: 255 255 255;
+  --panel-strong: rgb(255 255 255 / 0.96);
+  --border-alpha: 0.1;
+  --line: rgb(21 35 43 / 0.12);
+  --accent: #0b8457;
+  --accent-alt: #2f6fed;
+  --accent-soft: color-mix(in srgb, #0b8457 12%, transparent);
+  --glow-start: color-mix(in srgb, #0b8457 9%, transparent);
+  --glow-end: color-mix(in srgb, #2f6fed 9%, transparent);
+  --on-accent: #ffffff;
+  --modal-bg-rgb: 255 255 255;
+  --modal-alpha: 0.97;
+  --modal-backdrop-alpha: 0.32;
+  --admin-panel-rgb: 255 255 255;
+  --admin-panel-alpha: 0.88;
+  --admin-sidebar-rgb: 248 250 251;
+  --admin-sidebar-alpha: 0.95;
+  --admin-menu-text-color: #334155;
+  --admin-menu-btn-bg: #ffffff;
+  --admin-menu-btn-text: #334155;
+  --admin-menu-btn-hover-bg: #e3f3ec;
+  --admin-menu-btn-hover-text: #0b8457;
+  --admin-menu-btn-active-bg: #d1f0e2;
+  --admin-menu-btn-active-text: #065f46;
+  --btn-glow-color: #0b8457;
+  --btn-border-color: #cfd8dd;
+  --btn-normal-bg: #0b8457;
+  --btn-normal-text: #ffffff;
+  --btn-normal-hover-bg: #096c47;
+  --btn-normal-hover-text: #ffffff;
+  --btn-danger-bg: #fde2e2;
+  --btn-danger-text: #b91c1c;
+  --btn-danger-hover-bg: #fbcaca;
+  --btn-danger-hover-text: #7f1d1d;
+  --btn-danger-glow-color: #ef4444;
+}
+
+/* Przełącznik dzień / noc w menu Zaplecza (ikona jak na Stronie Głównej). */
+#adminModeToggle { font-size: 18px; }
+#adminModeToggle .theme-toggle { display: inline-flex; }
+
+/* Pasek tytułu Zaplecza nie potrzebuje wysokości paska strony głównej */
+.admin-main .toolbar { min-height: 0; }
+
+/* Zapobieganie brzydkiemu żółtemu tłu autofill przeglądarek */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0px 1000px rgb(var(--surface-base-rgb, 14 24 29) / 0.95) inset !important;
+  -webkit-text-fill-color: var(--text, #ffffff) !important;
+  caret-color: var(--text, #ffffff) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Ekran Blokady PIN (W 100% ujednolicony z oknami modalnymi IF-startpage) */
+.admin-lock-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: rgb(0 0 0 / var(--modal-backdrop-alpha, 0.62));
+  backdrop-filter: blur(var(--modal-backdrop-blur, 3px));
+  -webkit-backdrop-filter: blur(var(--modal-backdrop-blur, 3px));
+}
+
+.admin-lock-screen form {
+  width: min(440px, calc(100vw - 28px));
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+  border-radius: var(--modal-radius, 20px);
+  border: 1px solid var(--line);
+  background: rgb(var(--modal-bg-rgb, var(--surface-base-rgb, 14 24 29)) / max(var(--modal-alpha, 0.92), 0.2));
+  backdrop-filter: blur(var(--modal-glass-blur, 16px)) saturate(var(--glass-saturation, 100%));
+  -webkit-backdrop-filter: blur(var(--modal-glass-blur, 16px)) saturate(var(--glass-saturation, 100%));
+  color: var(--text);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+}
+
+.admin-lock-screen form .modal-heading h2 {
+  margin: 3px 0 0;
+  font-size: 22px;
+  color: var(--text);
+}
+
+.admin-lock-screen form label {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-lock-screen form menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+/* Główny Układ Zaplecza (Layout) */
+.admin-layout {
+  display: grid;
+  grid-template-columns: var(--admin-sidebar-width, 280px) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 18px 18px 22px;
+  border-right: 1px solid var(--line);
+  background: rgb(var(--admin-sidebar-rgb, var(--admin-panel-rgb, 14 24 29)) / var(--admin-sidebar-alpha, var(--admin-panel-alpha, 0.85)));
+  backdrop-filter: blur(var(--glass-blur, 12px)) saturate(var(--glass-saturation, 100%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px)) saturate(var(--glass-saturation, 100%));
+  box-shadow: var(--tile-shadow);
+  color: var(--admin-menu-text-color, var(--text));
+}
+
+.admin-sidebar .brand p { color: color-mix(in srgb, var(--admin-menu-text-color, var(--muted)) 70%, transparent) !important; }
+
+.admin-nav {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+/* Spójne style przycisków w menu bocznym (Sidebar buttons) */
+.admin-sidebar .nav-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  text-decoration: none !important;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--btn-radius, 12px);
+  background: color-mix(in srgb, var(--admin-menu-btn-bg) 55%, transparent) !important;
+  color: var(--admin-menu-btn-text, var(--admin-menu-text-color, var(--text))) !important;
+  padding: 10px 14px;
+  font-family: var(--font-menu, Inter);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: none !important;
+  transition: all 0.16s ease;
+}
+
+.admin-sidebar .nav-button:hover {
+  background: var(--admin-menu-btn-hover-bg, color-mix(in srgb, var(--accent) 20%, transparent)) !important;
+  color: var(--admin-menu-btn-hover-text, var(--accent)) !important;
+  box-shadow: none !important;
+}
+
+.admin-sidebar .nav-button.active, 
+.admin-sidebar .nav-button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--admin-menu-btn-active-text) 45%, transparent) !important;
+  background: var(--admin-menu-btn-active-bg) !important;
+  color: var(--admin-menu-btn-active-text) !important;
+  box-shadow: 0 2px var(--btn-glow) color-mix(in srgb, var(--btn-glow-color) 22%, transparent) !important;
+}
+
+/* Przycisk akcji wylogowania w menu bocznym */
+.admin-sidebar .nav-button.danger {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  background: var(--admin-menu-btn-bg, transparent) !important;
+  color: #f87171 !important;
+  box-shadow: none !important;
+}
+
+.admin-sidebar .nav-button.danger:hover {
+  border-color: rgba(239, 68, 68, 0.7) !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ff6b6b !important;
+  box-shadow: none !important;
+}
+
+.admin-main {
+  padding: var(--page-pad-y, 26px) var(--page-pad-x, 32px);
+  overflow-y: auto;
+}
+
+.admin-content {
+  margin-top: 10px;
+}
+
+/* Panele i Formularze */
+.admin-form-panel {
+  max-width: 900px;
+  display: grid;
+  gap: 20px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.admin-form-grid.three-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.admin-form-grid label {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-form-grid label > span:not(.info-tip):not(.field-title) {
+  position: absolute;
+  right: 0;
+  top: 0;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.admin-form-grid label input[type="color"] {
+  width: 100%;
+  height: 42px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.admin-form-grid label input[type="range"] {
+  padding: 0;
+}
+
+.admin-form-grid.two-cols-span label:nth-child(2) {
+  grid-column: 1 / -1;
+}
+
+.admin-form-panel menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 15px;
+  padding: 0;
+}
+
+.admin-section-card p,
+.admin-section-card .settings-note,
+.admin-section-card small {
+  font-family: var(--font-description, inherit);
+}
+
+.admin-form-panel .settings-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-tab-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap, 20px);
+}
+
+.admin-section-card {
+  font-family: var(--font-card, inherit);
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--card-radius, 16px);
+  background: rgb(var(--admin-panel-rgb, 14 24 29) / max(var(--admin-panel-alpha, 0.85), 0.08));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(var(--glass-blur, 12px)) saturate(var(--glass-saturation, 100%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px)) saturate(var(--glass-saturation, 100%));
+}
+
+.admin-section-card h2 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  /* Akcent pomocniczy = kolor nagłówków (jak Akcent 2 na Stronie Głównej). */
+  color: var(--accent-alt);
+}
+
+.admin-section-card h4 {
+  margin: 16px 0 12px 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.admin-section-divider {
+  height: 2px;
+  background: color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 2px;
+  margin: 4px 0;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* Przyciski w Zapleczu — kolory z edytora „Wygląd Zaplecza” (zmienne --btn-*) */
+.button,
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--btn-radius, 10px);
+  border: var(--btn-border-width, 1px) solid var(--btn-border-color, var(--line));
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  box-shadow: none;
+}
+
+.button:hover,
+button:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--text) 11%, transparent);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.button.primary,
+button.primary,
+input[type="submit"].primary {
+  border-color: var(--btn-normal-bg) !important;
+  background: var(--btn-normal-bg) !important;
+  color: var(--btn-normal-text) !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px var(--btn-glow) color-mix(in srgb, var(--btn-glow-color) 30%, transparent) !important;
+}
+
+.button.primary:hover,
+button.primary:hover,
+input[type="submit"].primary:hover {
+  border-color: var(--btn-normal-hover-bg) !important;
+  background: var(--btn-normal-hover-bg) !important;
+  color: var(--btn-normal-hover-text) !important;
+  transform: translateY(-1px);
+}
+
+.button.danger,
+button.danger {
+  border-color: color-mix(in srgb, var(--btn-danger-glow-color) 45%, transparent) !important;
+  background: var(--btn-danger-bg) !important;
+  color: var(--btn-danger-text) !important;
+}
+
+.button.danger:hover,
+button.danger:hover {
+  background: var(--btn-danger-hover-bg) !important;
+  color: var(--btn-danger-hover-text) !important;
+  box-shadow: 0 4px var(--btn-glow) color-mix(in srgb, var(--btn-danger-glow-color) 30%, transparent) !important;
+  transform: translateY(-1px);
+}
+
+input[type="text"], input[type="password"], input[type="url"], input[type="number"], select, textarea {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: var(--card-radius, 10px);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--input-text, var(--text));
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--input-text, var(--text)) 55%, transparent); opacity: 1; }
+
+input[type="text"]:focus, input[type="password"]:focus, input[type="url"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* Modale w Zapleczu — 100% Spójność z motywem Homepage */
+dialog {
+  width: min(460px, calc(100vw - 28px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--modal-radius, 20px);
+  background: rgb(var(--modal-bg-rgb, var(--surface-base-rgb)) / max(var(--modal-alpha, 0.92), 0.2));
+  backdrop-filter: blur(var(--modal-glass-blur, 16px)) saturate(var(--glass-saturation, 100%));
+  -webkit-backdrop-filter: blur(var(--modal-glass-blur, 16px)) saturate(var(--glass-saturation, 100%));
+  color: var(--text);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+}
+
+dialog.wide-dialog {
+  width: min(860px, calc(100vw - 28px));
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / var(--modal-backdrop-alpha, 0.62));
+  backdrop-filter: blur(var(--modal-backdrop-blur, 3px));
+  -webkit-backdrop-filter: blur(var(--modal-backdrop-blur, 3px));
+}
+
+.modal-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.modal-heading h2 {
+  margin: 3px 0 0;
+  font-size: 24px;
+  color: var(--accent-alt);
+}
+
+.modal-heading > button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--muted);
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: all 0.16s ease;
+}
+
+.modal-heading > button:hover {
+  background: color-mix(in srgb, var(--text) 14%, transparent) !important;
+  color: var(--text) !important;
+  border-color: var(--line) !important;
+}
+
+dialog menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+/* ==========================================================================
+   Zakładka "Moduły" — Hub z kafelkami (wprowadzone w v0.4.2)
+   ========================================================================== */
+
+.modules-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.module-tile {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  text-align: left;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--card-radius, 16px);
+  background: rgb(var(--admin-panel-rgb, 14 24 29) / max(var(--admin-panel-alpha, 0.85), 0.08));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(var(--glass-blur, 12px)) saturate(var(--glass-saturation, 100%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px)) saturate(var(--glass-saturation, 100%));
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.16s ease;
+}
+
+.module-tile:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 4px var(--btn-glow, 10px) var(--btn-glow-color, color-mix(in srgb, var(--accent) 40%, transparent));
+  transform: translateY(-2px);
+}
+
+.module-tile-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.module-tile-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.module-tile-desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Przycisk powrotu z widoku pojedynczego modułu do huba "Moduły" */
+.module-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+/* Suwaki i pola wyboru w kolorze akcentu Zaplecza */
+.admin-body input[type="range"],
+.admin-body input[type="checkbox"],
+.admin-body input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+/* Progi temperatur (Centrum alertów) */
+.temp-thresholds-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.temp-thresholds-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+}
+.temp-thresholds-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.temp-thresholds-table input { width: 90px; min-height: 36px; padding: 4px 8px; }
+.temp-now { display: inline-block; min-width: 58px; padding: 3px 10px; border-radius: 999px; font-weight: 800; text-align: center; }
+.temp-now.is-ok { background: #047857; color: #ffffff; }
+.temp-now.is-warn { background: #c2410c; color: #ffffff; }
+.temp-now.is-alarm { background: #b91c1c; color: #ffffff; }
+.temp-thresholds-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+
+/* Ikony Lucide w menu i tytule zakładki Zaplecza (te same co na Stronie Głównej). */
+.admin-sidebar .nav-button .ui-icon { flex-shrink: 0; }
+#tabTitle { display: flex; align-items: center; gap: 10px; }
+#tabTitle .ui-icon { flex-shrink: 0; color: var(--accent); }
+
+/* Ikony aplikacji (Strony i sekcje): przesyłanie i lista */
+.icons-upload-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.icons-upload-pick { flex: 1; min-width: 240px; }
+.icons-upload-pick input { width: 100%; }
+.icons-upload-result { display: grid; gap: 6px; margin-top: 12px; font-size: 13px; }
+.icons-upload-ok, .icons-upload-bad { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 10px; }
+.icons-upload-ok { background: #047857; color: #ffffff; }
+.icons-upload-bad { background: #b91c1c; color: #ffffff; }
+.icons-upload-ok code, .icons-upload-bad code { color: inherit; }
+/* Okno listy mieści się w ekranie — przewija się tylko tabela. */
+#iconsListDialog { max-height: calc(100vh - 32px); overflow: hidden; }
+#iconsListDialog .modal-panel { max-height: calc(100vh - 34px); grid-template-rows: auto auto auto minmax(0, 1fr) auto; box-sizing: border-box; }
+.icons-list-box { min-height: 0; overflow: auto; }
+.icons-list-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.icons-list-table th { position: sticky; top: 0; z-index: 1; padding: 8px 10px; background: rgb(var(--modal-bg-rgb, var(--surface-base-rgb))); color: var(--muted); font-size: 11px; font-weight: 800; text-align: left; text-transform: uppercase; }
+.icons-list-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.icons-list-table td:first-child { width: 56px; }
+.icons-list-table td:last-child { width: 1%; white-space: nowrap; }
+.icons-list-table img { display: block; width: 36px; height: 36px; object-fit: contain; }
+.icons-builtin-tag { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted); font-size: 11px; font-weight: 800; }
+/* Aktualizacje: linijka z wersją IF-home-server. */
+.if-server-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; margin-top: 10px; font-size: 14px; }
+.icons-lucide-tag { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent-alt) 14%, transparent); color: var(--accent-alt); font-size: 11px; font-weight: 800; }
+.icons-lucide-preview { display: grid; place-items: center; width: 36px; height: 36px; color: var(--text); }
+.icons-own-tag { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 800; }
+
+/* Strony i sekcje — bloki i pola zależne od motywu (dzień / noc) */
+.hp-box { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--text) 4%, transparent); }
+.hp-input { flex: 1; font-size: 14px; }
+.hp-home-tag { display: inline-flex; align-items: center; gap: 2px; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 800; }
+.hp-icon-preview { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border: 1px solid var(--line); border-radius: 10px; color: var(--accent); }
+.hp-icon-input { width: 170px; flex: 0 0 170px; font-size: 13px; }
+
+/* Menu Zaplecza — podpisy grup (Treść strony / Serwer / Ustawienia) z kreską nad grupą. */
+.admin-nav-group { margin: 14px 4px 4px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.admin-nav .admin-nav-group:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
+/* Stopka menu Zaplecza: trzy ikonki w rzędzie, kolory z menu Zaplecza. */
+.admin-sidebar-footer { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); }
+.admin-sidebar .sidebar-tools { display: flex; justify-content: center; gap: 10px; }
+.admin-sidebar .sidebar-tools .sidebar-icon-btn {
+  width: 44px; max-width: 44px; height: 44px; font-size: 18px; text-decoration: none;
+  background: color-mix(in srgb, var(--admin-menu-btn-bg) 55%, transparent);
+  color: var(--admin-menu-btn-text, var(--text));
+  border: 1px solid var(--line);
+}
+.admin-sidebar .sidebar-tools .sidebar-icon-btn:hover {
+  background: var(--admin-menu-btn-hover-bg, color-mix(in srgb, var(--accent) 20%, transparent));
+  color: var(--admin-menu-btn-hover-text, var(--accent));
+}
+.admin-sidebar .sidebar-tools .admin-logout-btn { color: var(--danger, #ef7777); }
+.admin-sidebar .sidebar-tools .admin-logout-btn:hover { background: color-mix(in srgb, var(--danger, #ef7777) 18%, transparent); color: var(--danger, #ef7777); }
+
+/* Aktualizacje — rodzaje wersji, uwagi, przyciski */
+.upd-tag { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.upd-tag-ok { background: color-mix(in srgb, #10b981 18%, transparent); color: #10b981; }
+.upd-tag-warn { background: color-mix(in srgb, #f59e0b 18%, transparent); color: #d97706; }
+.upd-patch { font-weight: 700; }
+.upd-major { margin-top: 4px; color: #d97706; font-weight: 700; }
+.upd-local { color: var(--muted); font-style: italic; }
+.upd-link { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; color: var(--accent); font-size: 11px; text-decoration: none; }
+.upd-link:hover { text-decoration: underline; }
+.upd-note { margin-top: 4px; max-width: 260px; color: var(--muted); font-size: 11px; font-weight: 500; line-height: 1.35; }
+.upd-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-app-version { font-weight: 700; color: var(--accent); }
+
+/* Aktualizacje Debiana (lista z pliku od serwera) */
+.sys-upd-box { padding: 12px 16px; border-radius: 10px; background: color-mix(in srgb, #3b82f6 12%, transparent); font-size: 13px; line-height: 1.5; }
+.sys-upd-ok { padding: 12px 16px; border-radius: 10px; background: color-mix(in srgb, #10b981 12%, transparent); color: #10b981; font-size: 13px; font-weight: 600; }
+.sys-upd-warn { padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, #f59e0b 14%, transparent); font-size: 13px; font-weight: 600; }
+.sys-upd-stale { margin-bottom: 8px; color: #d97706; font-size: 12px; font-weight: 600; }
+.sys-upd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sys-upd-table th { padding: 6px 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 800; text-align: left; text-transform: uppercase; }
+.sys-upd-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+
+/* Okienko pytania / komunikatu (ifConfirm, ifAlert w ui-icons.js) — zamiast okienek przeglądarki. */
+dialog.if-confirm { width: min(440px, calc(100vw - 28px)); }
+.if-confirm .if-confirm-message { margin: 0; color: var(--text); font-size: 14px; line-height: 1.55; white-space: pre-line; }

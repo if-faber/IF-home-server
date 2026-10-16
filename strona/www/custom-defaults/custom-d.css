@@ -1,0 +1,39 @@
+/* IF-startpage — wygląd startowy trybu DZIEŃ (domyślny custom-d.css)
+   Używany, dopóki w katalogu konfiguracji nie ma Twojego custom-d.css.
+   Zawiera tylko właściwości, którymi steruje edytor wyglądu (🎨). */
+
+html[data-mode="d"] body {
+  color-scheme: light;
+  --text: #15232b; /* Kolor tekstu */
+  --muted: #5d6e78; /* Kolor tekstu pomocniczego */
+  --on-accent: #ffffff; /* Tekst na przyciskach w kolorze akcentu */
+  --accent: #0b8457; /* Akcent */
+  --accent-soft: color-mix(in srgb, #0b8457 12%, transparent); /* Akcent — tło przycisków (z akcentu) */
+  --glow-start: color-mix(in srgb, #0b8457 9%, transparent); /* Poświata tła (z akcentu) */
+  --accent-alt: #2f6fed; /* Akcent 2 */
+  --glow-end: color-mix(in srgb, #0b8457 9%, transparent); /* Poświata tła (z akcentu) */
+  --page-bg: #eef2f5; /* Tło strony */
+  --surface-base-rgb: 255 255 255; /* Kolor motywu */
+  --panel-strong: rgb(255 255 255 / 0.94); /* Kolor przycisku menu i powiadomień (z koloru motywu) */
+  --background-image: none; /* Obraz tła */
+  --background-image-opacity: 0; /* Widoczność obrazu */
+  --background-image-blur: 0px; /* Rozmycie obrazu */
+  --background-image-dim: 0; /* Przyciemnienie tła */
+  --title-color: #15232b; /* Kolor nazwy serwisu */
+  --subtitle-color: #5d6e78; /* Kolor sloganu */
+  --sidebar-panel-rgb: 255 255 255; /* Kolor tła menu */
+  --sidebar-panel-alpha: 0.72; /* Krycie menu */
+  --sidebar-toggle-color: #0b8457; /* Kolor ikon menu (przyciski menu i ☰) */
+  --tile-panel-rgb: 255 255 255; /* Kolor kafelków */
+  --tile-panel-alpha: 0.9; /* Krycie kafelków */
+  --tile-height: 104px; /* Wysokość kafelków */
+  --admin-panel-rgb: 255 255 255; /* Kolor kart statusu */
+  --admin-panel-alpha: 0.88; /* Krycie kart statusu */
+  --border-alpha: 0.1; /* Obramowanie kart */
+  --line: rgb(21 35 43 / 0.1); /* Kolor linii i ramek (z koloru tekstu) */
+  --card-radius: 18px; /* Zaokrąglenie kart */
+  --card-gap: 16px; /* Odstęp kart */
+  --modal-bg-rgb: 255 255 255; /* Kolor okien */
+  --modal-alpha: 0.97; /* Krycie okien */
+  --modal-backdrop-alpha: 0.32; /* Przyciemnienie pod oknem */
+}

@@ -1,0 +1,13 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# Sekrety — nigdy nie commitować prawdziwych plikow .env (tylko przykladowe *.env.example)
+*.env
+!*.env.example
+www-helper/config/
+
+# Tła wgrane przez użytkownika w UI (dane prywatne, nie do repo)
+www/images/background-custom.*
+www/images/background-admin-custom.*

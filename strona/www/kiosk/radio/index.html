@@ -1,0 +1,41 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Radio kiosk</title>
+  <link rel="stylesheet" href="style.css?v=pc-20260510-3">
+</head>
+<body>
+  <main class="radio-view" aria-label="Radio">
+    <section class="radio-panel">
+      <header class="radio-display" aria-live="polite">
+        <span id="radioSignal">STANDBY</span>
+        <strong id="radioTitle">Wybierz stacje</strong>
+        <small id="radioSubtitle">RMF FM, Eska albo Radio ZET</small>
+      </header>
+
+      <audio id="radioPlayer" preload="none"></audio>
+
+      <div class="spectrum" id="radioSpectrum" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="station-grid" id="stationGrid" aria-label="Stacje radiowe"></div>
+
+      <div class="radio-controls">
+        <button class="primary-action" id="radioToggle" type="button">Odtworz</button>
+        <button class="ghost-action" id="radioStop" type="button">Stop</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js?v=pc-20260510-3"></script>
+</body>
+</html>

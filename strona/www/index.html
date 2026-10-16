@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pl" data-dashboard="nas">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>IF-startpage</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="./images/apple-touch-icon.png?v=if1">
+    <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon-32.png?v=if1">
+    <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon-16.png?v=if1">
+    <link rel="icon" href="./images/favicon.ico?v=if1">
+    <link rel="manifest" href="./images/manifest.webmanifest?v=if1">
+    <script>
+      // Tryb dzień/noc ustawiony przed wyświetleniem strony (bez mignięcia).
+      try { document.documentElement.dataset.mode = localStorage.getItem("ifs.mode") === "d" ? "d" : "n"; }
+      catch (e) { document.documentElement.dataset.mode = "n"; }
+    </script>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" id="customCss-d" href="/custom/custom-d.css">
+    <link rel="stylesheet" id="customCss-n" href="/custom/custom-n.css">
+    <link rel="stylesheet" href="./mods/top/top.css">
+    <script src="./mods/top/top.js" defer></script>
+    <script src="./ui-icons.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body class="theme-nas">
+    <div id="app"></div>
+  </body>
+</html>

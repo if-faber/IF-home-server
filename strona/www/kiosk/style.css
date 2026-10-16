@@ -1,0 +1,414 @@
+:root {
+  color-scheme: dark;
+  --bg: #05090d;
+  --panel-bg: rgb(7 14 20 / 0.88);
+  --line: rgb(255 255 255 / 0.14);
+  --text: #eef6f8;
+  --muted: #9eb0bd;
+  --accent: #55f0b2;
+  --accent-glow: rgb(85 240 178 / 0.35);
+  --accent-border: rgb(85 240 178 / 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.kiosk-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#viewerFrame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg);
+}
+
+/* --- NATYWNE PANELE STATUSU SERWERA (Status serwera / Live / Status kontenerów) --- */
+.kiosk-native-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 56px 28px 100px;
+  background: radial-gradient(circle at 50% 15%, rgb(18 32 46), rgb(5 9 13));
+  display: none;
+  z-index: 5;
+}
+
+.kiosk-native-panel.is-visible {
+  display: block;
+}
+
+.knp-section {
+  max-width: 1100px;
+  margin: 0 auto 24px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+}
+
+.knp-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.knp-title {
+  margin: 0 0 16px;
+  font-size: 20px;
+  color: var(--accent);
+}
+
+.knp-subtext {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.knp-loading,
+.knp-empty {
+  max-width: 1100px;
+  margin: 40px auto;
+  text-align: center;
+  padding: 30px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.knp-alert-ok {
+  color: var(--accent);
+}
+
+.knp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.knp-core-box,
+.knp-disk-box {
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.knp-core-header,
+.knp-disk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.knp-temp-cool { color: var(--accent); }
+.knp-temp-warm { color: #facc15; }
+.knp-temp-hot { color: #ff6b6b; }
+
+.knp-bar {
+  height: 10px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.08);
+  overflow: hidden;
+}
+
+.knp-bar-lg {
+  height: 20px;
+  max-width: 1100px;
+  margin-bottom: 10px;
+}
+
+.knp-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.knp-bar-fill.is-high {
+  background: #ff6b6b;
+}
+
+.knp-bar-label {
+  margin-top: 6px;
+  font-size: 12px;
+  text-align: right;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.knp-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.knp-alert-item {
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 4px solid var(--muted);
+  background: rgb(255 255 255 / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.knp-alert-item.knp-alert-critical {
+  border-left-color: #ff6b6b;
+}
+
+.knp-alert-item.knp-alert-warning {
+  border-left-color: #facc15;
+}
+
+.knp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.knp-table th,
+.knp-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.knp-table th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.knp-badge-cpu,
+.knp-badge-mem {
+  font-family: monospace;
+  color: var(--accent);
+}
+
+.knp-badge-ok {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.knp-badge-bad {
+  color: #ff6b6b;
+  font-weight: 700;
+}
+
+/* --- PRZYCISK MENU (NOTCH TRIGGER BUTTON AT BOTTOM) --- */
+.kiosk-notch {
+  position: fixed !important;
+  bottom: 20px !important;
+  top: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 10000 !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  min-height: 42px;
+  background: var(--notch-bg, rgba(16, 185, 129, 0.92));
+  color: var(--notch-text, #ffffff);
+  border: 1px solid var(--notch-border, #10b981);
+  border-radius: var(--notch-radius, 24px);
+  cursor: pointer;
+  backdrop-filter: blur(var(--notch-blur, 16px));
+  -webkit-backdrop-filter: blur(var(--notch-blur, 16px));
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 var(--notch-glow, 12px) var(--notch-border, #10b981);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kiosk-notch:hover {
+  filter: brightness(1.1);
+}
+
+.kiosk-notch:active {
+  transform: translateX(-50%) scale(0.92) !important;
+}
+
+.notch-indicator {
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.notch-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* --- SPŁYWAJĄCE MENU LIZAKOWE (LOLLIPOP DROPDOWN PANEL) --- */
+.lollipop-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px 20px 28px;
+  background: var(--lollipop-bg, rgba(15, 23, 42, 0.92));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(var(--lollipop-blur, 20px)) saturate(var(--lollipop-sat, 140%));
+  -webkit-backdrop-filter: blur(var(--lollipop-blur, 20px)) saturate(var(--lollipop-sat, 140%));
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  z-index: 10000;
+  transform: translateY(-100%);
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  pointer-events: none;
+  opacity: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.lollipop-menu.is-open {
+  transform: translateY(0);
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.lollipop-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 16px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 4px 0;
+}
+
+/* --- KAFELEK LIZAKOWY (LOLLIPOP ITEM) --- */
+.lollipop-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease;
+}
+
+.lollipop-menu.is-open .lollipop-item {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.lollipop-item:active {
+  transform: scale(0.92) !important;
+}
+
+.lollipop-head {
+  position: relative;
+  z-index: 2;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--lollipop-btn-bg, #1e293b);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lollipop-head img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  opacity: 0.9;
+  transition: transform 0.25s, opacity 0.25s;
+}
+
+.lollipop-stem {
+  position: relative;
+  z-index: 1;
+  margin-left: -20px;
+  padding: 8px 20px 8px 28px;
+  height: 42px;
+  border-radius: 0 var(--lollipop-radius, 20px) var(--lollipop-radius, 20px) 0;
+  background: var(--lollipop-btn-bg, #1e293b);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 0;
+  display: flex;
+  align-items: center;
+  color: var(--lollipop-btn-text, #ffffff);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lollipop-item.is-active .lollipop-head {
+  border-color: var(--lollipop-btn-active, #10b981);
+  background: var(--lollipop-btn-active, #10b981);
+  box-shadow: 0 0 20px var(--lollipop-btn-active-glow, rgba(16, 185, 129, 0.5));
+}
+
+.lollipop-item.is-active .lollipop-head img {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.lollipop-item.is-active .lollipop-stem {
+  background: var(--lollipop-btn-active, #10b981);
+  border-color: var(--lollipop-btn-active, #10b981);
+  color: var(--lollipop-btn-active-text, #ffffff);
+  box-shadow: 0 6px 18px var(--lollipop-btn-active-glow, rgba(16, 185, 129, 0.4));
+}
+
+.lollipop-item:hover .lollipop-head img {
+  opacity: 1;
+}
+
+.lollipop-item:hover:not(.is-active) .lollipop-head {
+  background: var(--lollipop-btn-hover-bg, rgba(255, 255, 255, 0.2));
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.lollipop-item:hover:not(.is-active) .lollipop-stem {
+  background: var(--lollipop-btn-hover-bg, rgba(255, 255, 255, 0.2));
+  color: var(--lollipop-btn-hover-text, #ffffff);
+}

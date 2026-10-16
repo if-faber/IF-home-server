@@ -10,7 +10,7 @@
 #   {user} — twoja nazwa użytkownika
 #
 # Wynik (JSON):
-#   {"checkedAt":"2026-10-13T14:00:00+02:00","packages":[
+#   {"checkedAt":"2026-10-13T14:00:00+02:00","ifServerVersion":"v0.3.0","packages":[
 #     {"name":"openssl","current":"3.5.1-1","available":"3.5.4-1","security":true}, ...]}
 
 set -euo pipefail
@@ -23,8 +23,12 @@ fi
 # Odświeżenie listy pakietów; błąd sieci nie przerywa — zapiszemy to, co apt już wie.
 apt-get update -qq >/dev/null 2>&1 || true
 
+# Wersja programu serwera IF-home-server (if-server) — strona pokazuje ją w Aktualizacjach.
+if_server_version="$(git -c safe.directory=/opt/if-home-server -C /opt/if-home-server describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+[[ "$if_server_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || if_server_version=""
+
 json="$(
-  printf '{"checkedAt":"%s","packages":[' "$(date -Iseconds)"
+  printf '{"checkedAt":"%s","ifServerVersion":"%s","packages":[' "$(date -Iseconds)" "$if_server_version"
   first=1
   # Linia: nazwa/źródło wersja architektura [upgradable from: stara-wersja]
   while IFS= read -r line; do

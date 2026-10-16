@@ -1,0 +1,35 @@
+# IF-startpage — wzór compose.yaml strony startowej.
+#
+# Stronę instaluje if-server (sudo if-server → Upgrade): sam podstawia nazwę użytkownika,
+# PIN i wersję, zakłada stos „if-startpage” w Dockge i foldery na dane.
+# Nie wklejaj tego pliku ręcznie do Dockge — {user} zostałoby w ścieżkach.
+#
+# Konwencja dwufolderowa pakietu Idea Forge:
+#   ten plik leży w   /home/{user}/docker/app/if-startpage/compose.yaml
+#   dane trwałe w     /home/{user}/docker/app-data/if-startpage/
+# Używamy pełnych ścieżek — zawsze wskazują właściwe miejsce, niezależnie
+# od tego, jak Dockge widzi swój katalog stosów.
+services:
+  if-startpage:
+    image: ghcr.io/if-faber/if-startpage:v0.3.0
+    container_name: if-startpage
+    restart: unless-stopped
+    ports:
+      - "80:3010"
+    environment:
+      # ZMIEŃ przed pierwszym uruchomieniem. Później PIN zmienisz też w Zapleczu.
+      - DASHBOARD_PIN=1234
+      - CONFIG_DIR=/app/config
+      - BACKUP_DIR=/app/backups
+      - HOST_APPS_DIR=/host-apps
+    volumes:
+      - /home/{user}/docker/app-data/if-startpage/config:/app/config
+      - /home/{user}/docker/app-data/if-startpage/backups:/app/backups
+      # Twoje ikony aplikacji do kafelków. W oknie linku wpisujesz nazwę pliku
+      # (np. immich.png). Ok. 100 popularnych jest już w obrazie.
+      - /home/{user}/docker/app-data/if-startpage/icons:/app/icons
+      # Zakładka Aktualizacje: odczyt i zapis tagów wersji w compose.yaml
+      # innych stosów — dlatego cały katalog docker/app/, nie tylko ten stos.
+      - /home/{user}/docker/app:/host-apps
+      # Diagnostyka, Status kontenerów, Aktualizacje — wgląd w Dockera hosta.
+      - /var/run/docker.sock:/var/run/docker.sock

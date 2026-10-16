@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Kiosk tablet</title>
+  <link rel="stylesheet" href="style.css?v=51">
+</head>
+<body>
+  <main class="kiosk-shell">
+    <!-- Ramka iframe dla zewnętrznych stron (np. Radio) -->
+    <iframe
+      id="viewerFrame"
+      title="Kiosk tablet"
+      referrerpolicy="no-referrer"
+      style="display: none;"
+    ></iframe>
+
+    <!-- Natywne panele statusu serwera: Status serwera / Live / Status kontenerów -->
+    <div class="kiosk-native-panel" id="kioskNativePanel"></div>
+
+    <!-- Uchwyt (Notch) do otwierania menu z góry -->
+    <button class="kiosk-notch" id="kioskNotch" type="button" aria-label="Otwórz menu nawigacji">
+      <span class="notch-indicator"></span>
+      <span class="notch-label">MENU</span>
+    </button>
+
+    <!-- Spływające Menu Lizakowe (Lollipop Dropdown Panel) -->
+    <nav class="lollipop-menu" id="lollipopMenu" aria-label="Nawigacja kiosku">
+      <div class="lollipop-grid"></div>
+    </nav>
+  </main>
+
+  <audio id="chimeAudioPlayer" preload="auto"></audio>
+  <script src="script.js?v=7"></script>
+  <script src="status-panels.js?v=1"></script>
+</body>
+</html>

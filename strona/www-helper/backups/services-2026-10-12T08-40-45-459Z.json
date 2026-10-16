@@ -1,0 +1,90 @@
+{
+ "sections": [
+  {
+   "id": "s1",
+   "name": "Dom",
+   "groups": [
+    {
+     "name": "Linki",
+     "items": [
+      {
+       "id": "l1",
+       "name": "Home Assistant",
+       "description": "Sterowanie domem",
+       "icon": "home-assistant.png",
+       "url": "http://serwer:8123",
+       "kind": "link"
+      },
+      {
+       "id": "l2",
+       "name": "Immich",
+       "description": "Zdjęcia rodzinne",
+       "icon": "immich.png",
+       "url": "http://serwer:2283",
+       "kind": "link"
+      },
+      {
+       "id": "l3",
+       "name": "Jellyfin",
+       "description": "Filmy i muzyka",
+       "icon": "jellyfin.png",
+       "url": "http://serwer:8096",
+       "kind": "link"
+      },
+      {
+       "id": "l4",
+       "name": "Paperless",
+       "description": "Dokumenty",
+       "icon": "paperless-ngx.png",
+       "url": "http://serwer:8000",
+       "kind": "link"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "name": "Serwer",
+   "groups": [
+    {
+     "name": "Linki",
+     "items": [
+      {
+       "id": "l5",
+       "name": "Dockge",
+       "description": "Kontenery",
+       "icon": "dockge.png",
+       "url": "http://serwer:5001",
+       "kind": "link"
+      },
+      {
+       "id": "l6",
+       "name": "Cockpit",
+       "description": "Administracja",
+       "icon": "cockpit.png",
+       "url": "https://serwer:9090",
+       "kind": "link"
+      },
+      {
+       "id": "l7",
+       "name": "Gitea",
+       "description": "Repozytoria",
+       "icon": "gitea.png",
+       "url": "http://serwer:3000",
+       "kind": "link"
+      },
+      {
+       "id": "l8",
+       "name": "Uptime Kuma",
+       "description": "Monitoring",
+       "icon": "uptime-kuma.png",
+       "url": "http://serwer:3001",
+       "kind": "link"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
