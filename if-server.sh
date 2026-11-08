@@ -614,10 +614,17 @@ server_status_text() {
 }
 
 show_server_status() {
-    local tmp
+    local tmp height max
     tmp="$(mktemp /tmp/if-server-stan.XXXXXX)"
     server_status_text > "$tmp"
-    whiptail --title "Stan serwera" --scrolltext --textbox "$tmp" 24 78
+    # Okno tak wysokie, żeby cała lista była widać bez przewijania (wcześniej stałe 24 linie
+    # ucinały ostatnie składniki); najwyżej wysokość terminala.
+    height=$(( $(wc -l < "$tmp") + 8 ))
+    max=$(( $(tput lines 2>/dev/null || echo 24) - 1 ))
+    [ "$max" -ge 24 ] || max=24
+    [ "$height" -le "$max" ] || height="$max"
+    [ "$height" -ge 24 ] || height=24
+    whiptail --title "Stan serwera" --scrolltext --textbox "$tmp" "$height" 78
     rm -f "$tmp"
 }
 
