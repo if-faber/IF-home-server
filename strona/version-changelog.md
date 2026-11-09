@@ -5,6 +5,16 @@ druga cyfra wersji jest wspólna z serwerem, trzecia — poprawki samej strony.
 
 ---
 
+## v0.4.0 — 2026-11-09
+
+Wersja stabilna: **kopia zapasowa i przywracanie** (od v0.3.5) oraz **Instalator aplikacji** (od v0.3.6), sprawdzone na serwerze.
+
+- **Ustawienia:** jedno pole **„Adres strony startowej (nazwa serwera)”** — jak domena strony (np. `iflab`); używają go odnośniki do Dockge, Cockpit i aplikacji. Zastępuje „Adres helpera” i „Domyślny host”. Strona zawsze rozmawia z serwerem pod adresem, pod którym ją otwarto — wpisana nazwa nie blokuje już startu strony przy wejściu przez numer IP. Dawny adres helpera z nazwą jest przejmowany sam.
+- Pole „Nazwa” → **„Tytuł strony”**.
+- `if-server` przy pierwszej instalacji wpisuje nazwę serwera jako adres strony startowej.
+
+---
+
 ## v0.3.6 — 2026-11-09
 
 **Instalator aplikacji** i porządki na stronie — wersja do testów; po ukończeniu aktualizacji: v0.4.0.

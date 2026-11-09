@@ -236,10 +236,9 @@ function appShell() {
           <button type="button" data-close aria-label="Zamknij">×</button>
         </header>
         <div class="settings-grid">
-          <label>Nazwa<input id="settingTitle" required></label>
+          <label>Tytuł strony<input id="settingTitle" required></label>
           <label>Opis<input id="settingSubtitle" required></label>
-          <label>Adres helpera<input id="settingApiUrl" required></label>
-          <label>Domyślny host<input id="settingDefaultHost" required></label>
+          <label><span class="field-title">Adres strony startowej (nazwa serwera) ${infoTip("Jak domena strony startowej, np. iflab — otwierasz ją pod http://iflab. Tej nazwy używają odnośniki do Dockge, Cockpit i aplikacji. if-server wpisuje ją przy instalacji (nazwa serwera). Stronę możesz też otworzyć przez numer IP — działa tak samo.")}</span><input id="settingDefaultHost" required></label>
           <label>Nowy PIN backendu<input id="settingNewPin" type="password" inputmode="numeric" placeholder="Puste = bez zmiany"></label>
           <label>Upload logo<input id="settingLogo" type="file" accept="image/png,image/jpeg,image/webp"></label>
         </div>
@@ -874,7 +873,6 @@ async function unlockAdminPanel(event) {
 function openSettingsPanel() {
   document.querySelector("#settingTitle").value = dashboardConfig.title;
   document.querySelector("#settingSubtitle").value = dashboardConfig.subtitle;
-  document.querySelector("#settingApiUrl").value = dashboardConfig.apiUrl;
   document.querySelector("#settingDefaultHost").value = dashboardConfig.defaultHost;
   document.querySelector("#settingNewPin").value = "";
   document.querySelector("#settingLogo").value = "";
@@ -888,7 +886,6 @@ async function saveDashboardSettings(event) {
   const payload = {
     title: document.querySelector("#settingTitle").value.trim(),
     subtitle: document.querySelector("#settingSubtitle").value.trim(),
-    apiUrl: document.querySelector("#settingApiUrl").value.trim(),
     defaultHost: document.querySelector("#settingDefaultHost").value.trim(),
     newPin: document.querySelector("#settingNewPin").value.trim(),
     logoData
@@ -923,7 +920,6 @@ function applyDashboardSettings(settings) {
   if (!settings) return;
   if (settings.title) dashboardConfig.title = settings.title;
   if (settings.subtitle) dashboardConfig.subtitle = settings.subtitle;
-  if (settings.apiUrl) dashboardConfig.apiUrl = settings.apiUrl;
   if (settings.defaultHost) dashboardConfig.defaultHost = settings.defaultHost;
   if (settings.logo) dashboardConfig.logo = settings.logo;
   if (state.data) {

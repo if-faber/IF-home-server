@@ -6,7 +6,6 @@ function renderHelperTab() {
   const config = {
     title: saved.title || "Serwer domowy",
     subtitle: saved.subtitle || "Usługi, narzędzia i administracja serwera",
-    apiUrl: saved.apiUrl || window.location.origin,
     defaultHost: saved.defaultHost || window.location.hostname
   };
   return `
@@ -15,10 +14,9 @@ function renderHelperTab() {
         <h2>${uiIcon("settings", 22)} Ustawienia Ogólne Systemu</h2>
         <form id="settingsForm" class="admin-form-panel">
           <div class="admin-form-grid">
-            <label>Nazwa serwera<input id="settingTitle" value="${escapeHtml(config.title ?? "")}" required></label>
+            <label>Tytuł strony<input id="settingTitle" value="${escapeHtml(config.title ?? "")}" required></label>
             <label>Opis / Podtytuł<input id="settingSubtitle" value="${escapeHtml(config.subtitle ?? "")}" required></label>
-            <label>Adres helpera API<input id="settingApiUrl" value="${escapeHtml(config.apiUrl ?? "")}" required></label>
-            <label>Domyślny host<input id="settingDefaultHost" value="${escapeHtml(config.defaultHost ?? "")}" required></label>
+            <label><span class="field-title">Adres strony startowej (nazwa serwera) ${infoTip("Jak domena strony startowej, np. iflab — otwierasz ją pod http://iflab. Tej nazwy używają odnośniki do Dockge, Cockpit i aplikacji. if-server wpisuje ją przy instalacji (nazwa serwera). Stronę możesz też otworzyć przez numer IP — działa tak samo.")}</span><input id="settingDefaultHost" value="${escapeHtml(config.defaultHost ?? "")}" required></label>
             <label>Nowy PIN administratora<input id="settingNewPin" type="password" inputmode="numeric" placeholder="Pozostaw puste = bez zmian"></label>
             <label>Upload logo (PNG/JPG)<input id="settingLogo" type="file" accept="image/png,image/jpeg,image/webp"></label>
           </div>
@@ -40,7 +38,6 @@ async function saveSettings(e) {
   const settings = {
     title: document.querySelector("#settingTitle").value.trim(),
     subtitle: document.querySelector("#settingSubtitle").value.trim(),
-    apiUrl: document.querySelector("#settingApiUrl").value.trim(),
     defaultHost: document.querySelector("#settingDefaultHost").value.trim(),
     logo: state.settings.logo,
     newPin: document.querySelector("#settingNewPin").value.trim()

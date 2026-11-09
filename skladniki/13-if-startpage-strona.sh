@@ -9,9 +9,9 @@
 #     właściwe miejsce (stare dane i stary stos zostają w kopii, nic nie kasujemy).
 # Wersja porównawcza = najnowsza wersja strony w chwili wydania serwera (USTALENIA home-server).
 NAZWA="IF-startpage (strona startowa)"
-WERSJA=7
+WERSJA=8
 
-IFSTARTPAGE_TAG="v0.3.6"
+IFSTARTPAGE_TAG="v0.4.0"
 
 ifstartpage_compose() {
     printf '%s\n' "${USER_HOME}/docker/app/if-startpage/compose.yaml"
@@ -159,6 +159,10 @@ zainstaluj() {
             info "Utworzono compose.yaml dla strony startowej ${IFSTARTPAGE_TAG}"
         fi
         mkdir -p "${data}/config" "${data}/backups" "${data}/icons"
+        # Nazwa serwera jako „domena” strony startowej (odnośniki do Dockge, Cockpit, aplikacji).
+        if [ ! -f "${data}/config/dashboard.json" ]; then
+            printf '{\n  "defaultHost": "%s"\n}\n' "$(hostname -s)" > "${data}/config/dashboard.json"
+        fi
         chown -R "${TARGET_USER}:${TARGET_USER}" "$dir" "$data"
         run "Uruchomienie strony startowej" docker compose -f "$compose" up -d
     fi
@@ -167,5 +171,5 @@ zainstaluj() {
     if systemctl cat if-system-updates.service >/dev/null 2>&1; then
         run "Lista aktualizacji Debiana dla strony" systemctl start --no-block if-system-updates.service
     fi
-    info "Strona startowa: http://<adres-serwera>"
+    info "Strona startowa: http://$(hostname -s) (albo http://<adres IP serwera>)"
 }

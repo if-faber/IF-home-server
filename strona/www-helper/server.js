@@ -194,6 +194,13 @@ function loadDashboardSettings() {
 
   try {
     const data = JSON.parse(fs.readFileSync(DASHBOARD_FILE, "utf8"));
+    // Dawne pole „Adres helpera” (np. http://iflab) z nazwą serwera → adres strony startowej,
+    // gdy ten jest pusty albo jest numerem IP.
+    try {
+      const fromApi = data.apiUrl ? new URL(data.apiUrl).hostname : "";
+      const isIp = /^[\d.]+$/.test(String(data.defaultHost || ""));
+      if (fromApi && !/^[\d.]+$/.test(fromApi) && (!data.defaultHost || isIp)) data.defaultHost = fromApi;
+    } catch {}
     return sanitizeDashboardSettings(data);
   } catch (error) {
     console.error("Load dashboard settings error:", error);
@@ -201,8 +208,12 @@ function loadDashboardSettings() {
   }
 }
 
+// Bez „apiUrl”: strona zawsze rozmawia z serwerem pod adresem, pod którym ją otwarto. Inny adres
+// (np. http://iflab przy wejściu przez IP) blokuje przeglądarka i strona się nie uruchamia
+// (Darek 9.11.2026). Nazwę serwera („domenę” strony, np. iflab) trzyma defaultHost — używają jej
+// odnośniki do Dockge, Cockpit i aplikacji.
 function sanitizeDashboardSettings(input) {
-  const allowed = ["title", "subtitle", "apiUrl", "defaultHost", "logo"];
+  const allowed = ["title", "subtitle", "defaultHost", "logo"];
   const output = {};
 
   for (const key of allowed) {
