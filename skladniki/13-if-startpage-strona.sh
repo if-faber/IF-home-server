@@ -9,9 +9,9 @@
 #     właściwe miejsce (stare dane i stary stos zostają w kopii, nic nie kasujemy).
 # Wersja porównawcza = najnowsza wersja strony w chwili wydania serwera (USTALENIA home-server).
 NAZWA="IF-startpage (strona startowa)"
-WERSJA=6
+WERSJA=7
 
-IFSTARTPAGE_TAG="v0.3.5"
+IFSTARTPAGE_TAG="v0.3.6"
 
 ifstartpage_compose() {
     printf '%s\n' "${USER_HOME}/docker/app/if-startpage/compose.yaml"

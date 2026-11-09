@@ -73,7 +73,7 @@ async function request(url, options = {}) {
     throw new Error("Niepoprawna odpowiedź serwera API.");
   }
   if (!response.ok) {
-    throw new Error(data.error || `Błąd serwera (kod ${response.status})`);
+    throw new Error(data.error || data.message || `Błąd serwera (kod ${response.status})`);
   }
   return data;
 }

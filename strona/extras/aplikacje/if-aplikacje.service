@@ -1,0 +1,8 @@
+[Unit]
+Description=IF-home-server: Instalator aplikacji (obsługa zleceń ze strony startowej)
+
+[Service]
+Type=oneshot
+# {user} — twoja nazwa użytkownika. Kolejne foldery config (np. wersja testowa) dopisz po spacji
+# i dodaj do if-aplikacje.path.
+ExecStart=/usr/local/bin/if-aplikacje obsluz /home/{user}/docker/app-data/if-startpage/config

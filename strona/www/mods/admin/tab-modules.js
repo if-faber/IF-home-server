@@ -12,6 +12,12 @@ const MODULES_REGISTRY = [
     icon: "monitor",
     name: "Kiosk Serwera",
     desc: "Tablet ze statusem serwera — temperatury, dyski, alerty, żywy podgląd kontenerów (styl ctop), status kontenerów i radio internetowe."
+  },
+  {
+    id: "ports",
+    icon: "search",
+    name: "Tester portów",
+    desc: "Pule portów według rodzaju aplikacji i sprawdzenie, czy port na serwerze jest wolny."
   }
 ];
 

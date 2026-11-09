@@ -11,7 +11,7 @@ function renderAlertsTab() {
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
           <h2 style="margin: 0;">${uiIcon("alerts", 22)} Stan Usług i Kondycja Serwera</h2>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <div id="alertsLiveBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: var(--muted);">
+            <div id="alertsLiveBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: var(--alerts-wyniki); font-weight: 700; background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: var(--muted);">
               <span id="alertsLiveDot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
               <span id="alertsLiveText">Aktualne</span>
             </div>
@@ -23,29 +23,29 @@ function renderAlertsTab() {
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
             <header style="margin-bottom: 8px;"><h3>Stan ogólny</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
-              <strong id="valAlertsStatus" style="font-size: 20px; line-height: 1.2;">--</strong>
-              <span id="subAlertsStatus" style="font-size: 12px; color: var(--muted); line-height: 1.4; word-break: break-word;">Inicjalizacja</span>
+              <strong id="valAlertsStatus" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">--</strong>
+              <span id="subAlertsStatus" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">Inicjalizacja</span>
             </div>
           </div>
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
             <header style="margin-bottom: 8px;"><h3>Aktywne alerty</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
-              <strong id="valAlertsTotal" style="font-size: 20px; line-height: 1.2;">0</strong>
-              <span id="subAlertsTotal" style="font-size: 12px; color: var(--muted); line-height: 1.4; word-break: break-word;">0 krytycznych</span>
+              <strong id="valAlertsTotal" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">0</strong>
+              <span id="subAlertsTotal" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">0 krytycznych</span>
             </div>
           </div>
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
             <header style="margin-bottom: 8px;"><h3>Kontenery Docker</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
-              <strong id="valAlertsRunning" style="font-size: 20px; line-height: 1.2;">--</strong>
-              <span id="subAlertsTotalCont" style="font-size: 12px; color: var(--muted); line-height: 1.4; word-break: break-word;">Wszystkich: --</span>
+              <strong id="valAlertsRunning" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">--</strong>
+              <span id="subAlertsTotalCont" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">Wszystkich: --</span>
             </div>
           </div>
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
             <header style="margin-bottom: 8px;"><h3>Sprzęt</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
-              <strong id="valAlertsCpu" style="font-size: 20px; line-height: 1.2;">-- °C</strong>
-              <span id="subAlertsRam" style="font-size: 12px; color: var(--muted); line-height: 1.4; word-break: break-word;">RAM: --%</span>
+              <strong id="valAlertsCpu" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">-- °C</strong>
+              <span id="subAlertsRam" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">RAM: --%</span>
             </div>
           </div>
         </div>
@@ -85,7 +85,7 @@ function renderAlertsTab() {
       <section class="admin-section-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
           <h2 style="margin: 0;">${uiIcon("warning", 22)} Wykryte Zgłoszenia i Awarie</h2>
-          <span id="activeIncidentsBadge" style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid var(--line);">0 zgłoszeń</span>
+          <span id="activeIncidentsBadge" style="font-size: var(--alerts-wyniki); font-weight: 700; padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid var(--line);">0 zgłoszeń</span>
         </div>
         <div id="alertsIncidentsList" style="display: flex; flex-direction: column; gap: 10px;">
           <div class="empty">Pobieranie alertów...</div>
@@ -110,21 +110,21 @@ function renderAlertsTab() {
       <!-- 4. Narzędzia Administracyjne -->
       <section class="admin-section-card">
         <h2 style="margin: 0 0 4px 0;">${uiIcon("tools", 22)} Wybierz narzędzie administracyjne</h2>
-        <p style="margin: 0 0 16px 0; font-size: 12px; color: var(--muted);">Bezpośrednie odnośniki do centralnych konsol zarządzania serwerem</p>
+        <p style="margin: 0 0 16px 0; font-size: var(--alerts-wyniki); color: var(--muted);">Bezpośrednie odnośniki do centralnych konsol zarządzania serwerem</p>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
           <a id="tabLinkCockpit" href="#" target="_blank" rel="noreferrer" class="tool-card" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); text-decoration: none; color: inherit; transition: transform 0.15s ease, background 0.15s ease;">
             <span style="display: inline-flex; color: var(--accent);">${uiIcon("terminal", 26)}</span>
             <div>
-              <strong style="display: block; font-size: 13px; color: var(--text);">Cockpit Linux</strong>
-              <span style="font-size: 11px; color: var(--muted);">Panel OS i logi (:9090)</span>
+              <strong style="display: block; font-size: var(--alerts-wyniki); color: var(--text);">Cockpit Linux</strong>
+              <span style="font-size: var(--alerts-wyniki); color: var(--muted);">Panel OS i logi (:9090)</span>
             </div>
             <span style="margin-left: auto; display: inline-flex; color: var(--muted);">${uiIcon("external", 14)}</span>
           </a>
           <a id="tabLinkDockge" href="#" target="_blank" rel="noreferrer" class="tool-card" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); text-decoration: none; color: inherit; transition: transform 0.15s ease, background 0.15s ease;">
             <span style="display: inline-flex; color: var(--accent);">${uiIcon("container", 26)}</span>
             <div>
-              <strong style="display: block; font-size: 13px; color: var(--text);">Dockge Stacks</strong>
-              <span style="font-size: 11px; color: var(--muted);">Zarządzanie kontenerami (:5001)</span>
+              <strong style="display: block; font-size: var(--alerts-wyniki); color: var(--text);">Dockge Stacks</strong>
+              <span style="font-size: var(--alerts-wyniki); color: var(--muted);">Zarządzanie kontenerami (:5001)</span>
             </div>
             <span style="margin-left: auto; display: inline-flex; color: var(--muted);">${uiIcon("external", 14)}</span>
           </a>
@@ -455,8 +455,8 @@ function renderIncidents(alerts) {
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; border-radius: 12px; background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.25);">
         <span style="margin-bottom: 6px; color: #34d399;">${uiIcon("ok", 34)}</span>
-        <strong style="color: #34d399; font-size: 14px;">Wszystkie usługi i kontenery działają prawidłowo.</strong>
-        <p style="color: var(--muted); font-size: 12px; margin: 4px 0 0;">Brak aktywnych incydentów w środowisku Homelab.</p>
+        <strong style="color: #34d399; font-size: var(--alerts-wyniki);">Wszystkie usługi i kontenery działają prawidłowo.</strong>
+        <p style="color: var(--muted); font-size: var(--alerts-wyniki); margin: 4px 0 0;">Brak aktywnych incydentów w środowisku Homelab.</p>
       </div>
     `;
     return;
@@ -468,7 +468,7 @@ function renderIncidents(alerts) {
     const level = isCritical ? "critical" : isInfo ? "info" : "warning";
     // Informacja o aktualizacjach prowadzi do zakładki Aktualizacje, nie do logów.
     const action = a.type === "updates"
-      ? `<button type="button" class="incident-bar-btn" onclick="switchTab('updates')">${uiIcon("package", 14)} Aktualizacje</button>`
+      ? `<button type="button" class="incident-bar-btn" onclick="switchTab('apps')">${uiIcon("package", 14)} Aplikacje</button>`
       : a.resource ? `<button type="button" class="incident-bar-btn" onclick="showContainerLogs('${escapeHtml(a.resource)}')">${uiIcon("logs", 14)} Logi</button>` : "";
     return `
       <div class="incident-bar ${level}">
@@ -506,15 +506,15 @@ function renderContainersGrid(containers) {
       <div style="display: flex; flex-direction: column; justify-content: space-between; gap: 10px; padding: 14px; border-radius: 12px; background: ${isRunning ? "rgba(255,255,255,0.03)" : "rgba(239,68,68,0.08)"}; border: 1px solid ${isRunning ? "var(--line)" : "rgba(239,68,68,0.4)"}; min-width: 0;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
           <div style="min-width: 0; flex: 1;">
-            <strong style="display: block; font-size: 13px; color: var(--text); word-break: break-all;">${escapeHtml(containerName)}</strong>
-            <div style="font-size: 11px; color: var(--muted); margin-top: 2px; word-break: break-word;">${escapeHtml(c.status || c.state)}</div>
+            <strong style="display: block; font-size: var(--alerts-wyniki); color: var(--text); word-break: break-all;">${escapeHtml(containerName)}</strong>
+            <div style="font-size: var(--alerts-wyniki); color: var(--muted); margin-top: 2px; word-break: break-word;">${escapeHtml(c.status || c.state)}</div>
           </div>
-          <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: ${isRunning ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.2)"}; color: ${isRunning ? "#34d399" : "#f87171"}; text-transform: uppercase; flex-shrink: 0;">
+          <span style="font-size: var(--alerts-wyniki); font-weight: 700; padding: 2px 6px; border-radius: 6px; background: ${isRunning ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.2)"}; color: ${isRunning ? "#34d399" : "#f87171"}; text-transform: uppercase; flex-shrink: 0;">
             ${escapeHtml(c.state || "unknown")}
           </span>
         </div>
         <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
-          <button type="button" class="button" onclick="showContainerLogs('${escapeHtml(containerName)}')" style="padding: 3px 8px; font-size: 11px;">${uiIcon("logs", 13)} Logi</button>
+          <button type="button" class="button" onclick="showContainerLogs('${escapeHtml(containerName)}')" style="padding: 3px 8px; font-size: var(--alerts-wyniki);">${uiIcon("logs", 13)} Logi</button>
         </div>
       </div>
     `;

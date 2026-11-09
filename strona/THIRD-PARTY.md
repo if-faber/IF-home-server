@@ -24,6 +24,7 @@ i linków (`www/lucide-sprite.svg`, z paczki `lucide-static` 1.56.0) pochodzą z
 ## Biblioteki
 
 - [Express](https://expressjs.com/) — licencja MIT.
+- [yaml](https://eemeli.org/yaml/) (Eemeli Aro) — licencja ISC. Instalator aplikacji: czytanie i zmiana compose z zachowaniem komentarzy.
 - Obraz bazowy [node](https://hub.docker.com/_/node) oraz CLI z obrazu
   [docker](https://hub.docker.com/_/docker).
 

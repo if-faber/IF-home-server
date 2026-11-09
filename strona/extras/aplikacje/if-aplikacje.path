@@ -1,0 +1,10 @@
+[Unit]
+Description=IF-home-server: Instalator aplikacji — czekanie na zlecenie ze strony startowej
+
+[Path]
+# Strona zostawia „karteczkę” aplikacje-zlecenie.json; if-aplikacje ją podejmuje i usuwa.
+PathExists=/home/{user}/docker/app-data/if-startpage/config/aplikacje-zlecenie.json
+Unit=if-aplikacje.service
+
+[Install]
+WantedBy=multi-user.target

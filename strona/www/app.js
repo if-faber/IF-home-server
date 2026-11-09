@@ -79,16 +79,6 @@ function fontValueFromStack(value) {
   return match?.[0] || "system";
 }
 
-const PORT_HINTS = {
-  system: { label: "System & Sieć", range: "2000-2099", typicalPorts: [2022, 2080, 2443], description: "Usługi bazowe i sieciowe" },
-  dashboard: { label: "Dashboard & Aplikacje", range: "3000-3099", typicalPorts: [3000, 3010, 3100], description: "Gitea Web, IF-startpage, Homebox" },
-  media: { label: "Media & Galeria", range: "4000-4099", typicalPorts: [4000, 4080, 2283], description: "Immich, strumieniowanie, odtwarzacze" },
-  administracja: { label: "Administracja & Narzędzia", range: "5000-5099", typicalPorts: [5000, 5001, 5090], description: "Gitea Registry, Dockge, Cockpit" },
-  monitoring: { label: "Monitoring & ESP", range: "6000-6099", typicalPorts: [6052, 6090, 6100], description: "ESPHome, telemetria, sensory" },
-  ha_iot: { label: "Smart Home & IoT", range: "7000-7099", typicalPorts: [7000, 7123, 8123], description: "Home Assistant, MQTT, automatyzacje" },
-  ai_testy: { label: "Dokumentacja & Usługi", range: "8000-8099", typicalPorts: [8000, 8010, 8080, 8085, 8090], description: "DokuWiki, Paperless, Memos, Stirling" }
-};
-
 function brandIcon() {
   return `<img src="${dashboardConfig.logo}" alt="" loading="eager">`;
 }
@@ -278,7 +268,7 @@ function appShell() {
             <div class="appearance-section-title">${uiIcon("appearance", 16)} Ogólne i Tło</div>
             <div class="appearance-section-grid">
               <label>Akcent<input id="themeAccent" type="color"></label>
-              <label><span class="field-title">Kolor nagłówków (Akcent 2) ${infoTip("Nagłówki na kafelkach i w okienkach: tytuły okien, tytuły kart (np. na stronach Status i Narzędzia). Napisy leżące wprost na tle strony mają własne kontrolki w części „Nagłówek i napisy na tle”.")}</span><input id="themeAccentAlt" type="color"></label>
+              <label><span class="field-title">Kolor nagłówków (Akcent 2) ${infoTip("Nagłówki na kafelkach i w okienkach: tytuły okien, tytuły kart (np. na stronie Status serwera). Napisy leżące wprost na tle strony mają własne kontrolki w części „Nagłówek i napisy na tle”.")}</span><input id="themeAccentAlt" type="color"></label>
               <label>Tło strony<input id="themeBg" type="color"></label>
               <label>Kolor motywu<input id="themeSurfaceColor" type="color"></label>
               <label>Kolor tekstu<input id="themeTextColor" type="color"></label>
@@ -304,7 +294,7 @@ function appShell() {
               <label>Wielkość sloganu<input id="themeSubtitleSize" type="range" min="11" max="28" step="1"><span></span></label>
               <label>Cień sloganu<input id="themeSubtitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
               <label>Rozmiar logo (do 260px)<input id="themeLogoSize" type="range" min="32" max="260" step="2"><span></span></label>
-              <label><span class="field-title">Kolor tytułu strony ${infoTip("Duży napis nad treścią, np. „Narzędzia”, „Top (procesy)”.")}</span><input id="themePageTitleColor" type="color"></label>
+              <label><span class="field-title">Kolor tytułu strony ${infoTip("Duży napis nad treścią, np. „Status serwera”.")}</span><input id="themePageTitleColor" type="color"></label>
               <label>Wielkość tytułu strony<input id="themePageTitleSize" type="range" min="16" max="52" step="1"><span></span></label>
               <label>Cień tytułu strony<input id="themePageTitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
               <label><span class="field-title">Kolor tytułów sekcji ${infoTip("Napisy nad grupami kafelków na stronach, np. ADMINISTRACJA SERWERA.")}</span><input id="themeSectionTitleColor" type="color"></label>
@@ -379,7 +369,7 @@ function appShell() {
         <menu>
           <button type="button" data-close>Zamknij</button>
           <button type="button" id="btnQuickRefresh" class="button">${uiIcon("refresh", 16)} Odśwież</button>
-          <a href="./mods/admin/?tab=alerts" class="button primary" style="display: inline-flex; align-items: center; text-decoration: none;">Centrum Alertów & Narzędzia →</a>
+          <a href="./mods/admin/?tab=alerts" class="button primary" style="display: inline-flex; align-items: center; text-decoration: none;">Centrum Alertów →</a>
         </menu>
       </div>
     </dialog>
@@ -469,10 +459,10 @@ function bindShell() {
   document.querySelector("#sidebarIconAlerts")?.addEventListener("click", openQuickAlertsModal);
   document.querySelector("#btnQuickRefresh")?.addEventListener("click", renderQuickAlertsContent);
   document.querySelector("#systemStatsWidget")?.addEventListener("click", () => {
-    // Bez modala: kliknięcie widżetu przenosi na Status Serwera i rozwija
-    // panel „Szczegółowa Diagnostyka (Top)”.
-    state.view = "top";
+    // Bez modala: kliknięcie widżetu przenosi na Status serwera, do panelu procesów (Top).
+    state.view = "status";
     render();
+    document.querySelector("#topPageMount")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   // Menu ⚙️ na dole paska bocznego (otwiera się w górę).
   const menu = document.querySelector("#sidebarMenu");
@@ -541,20 +531,16 @@ function toggleSidebar() {
 
 function render() {
   renderNavigation();
-  if (state.view === "admin" || state.view === "status") renderServerStatus();
-  else if (state.view === "top") renderTopPage();
-  else if (state.view === "tools") renderToolsPage();
-  else if (state.view === "alerts") renderAlertsPage();
+  // „top”, „alerts” i „tools” to dawne zakładki (do 0.3.5) — zapamiętane w przeglądarce prowadzą na Status serwera.
+  if (["admin", "status", "top", "alerts", "tools"].includes(state.view)) renderServerStatus();
   else renderLinks();
   syncSystemStatsPolling();
 }
 
-// Stałe strony serwera — pod kreską w menu.
+// Stałe strony serwera — pod kreską w menu. Procesy (Top) są w Statusie serwera, alerty — w dzwonku,
+// tester portów — w Zapleczu → Moduły (Darek 9.11.2026: zakładki Top, Alerty i Narzędzia usunięte).
 const SERVER_VIEWS = [
-  { view: "status", label: "Status serwera", icon: "status" },
-  { view: "top", label: "Top (procesy)", icon: "top" },
-  { view: "tools", label: "Narzędzia", icon: "tools" },
-  { view: "alerts", label: "Alerty", icon: "alerts" }
+  { view: "status", label: "Status serwera", icon: "status" }
 ];
 
 function sectionsOfPage(pageId) {
@@ -1391,38 +1377,92 @@ function renderServerStatus() {
       </div>
       <div class="cockpit-stats" id="systemStats"><div class="empty">Pobieranie danych…</div></div>
     </section>
+    <section class="admin-card status-updates-card">
+      <div class="panel-heading"><div><span class="eyebrow">Informacja</span><h2>Aktualizacje</h2></div></div>
+      <div class="status-updates" id="statusUpdates"><div class="empty">Sprawdzanie…</div></div>
+    </section>
+    <section class="admin-card status-top-card"><div id="topPageMount"></div></section>
   `;
   loadSystemStats();
-  document.querySelector("#btnRefreshServerStatus")?.addEventListener("click", loadSystemStats);
-}
-
-function renderTopPage() {
-  stopStatusTopDiagnostics();
-  document.querySelector("#viewTitle").textContent = "Top (procesy)";
-  document.querySelector("#toolbarActions").innerHTML = `
-    <button type="button" class="primary" id="btnRefreshTop">Odśwież</button>
-  `;
-  document.querySelector("#content").innerHTML = `
-    <section class="admin-card"><div id="topPageMount"></div></section>
-  `;
+  loadStatusUpdates();
+  // Procesy (Top) — dawna zakładka Top, z tym samym działaniem.
   statusTopController = TopDiagnostics.mount(document.querySelector("#topPageMount"));
   statusTopController.start();
-  document.querySelector("#btnRefreshTop")?.addEventListener("click", () => statusTopController?.refresh());
+  document.querySelector("#btnRefreshServerStatus")?.addEventListener("click", () => {
+    loadSystemStats();
+    loadStatusUpdates();
+    statusTopController?.refresh();
+  });
 }
 
-function renderToolsPage() {
-  stopStatusTopDiagnostics();
-  document.querySelector("#viewTitle").textContent = "Narzędzia";
-  document.querySelector("#toolbarActions").innerHTML = "";
-  // Strona Narzędzia: tester portów (bez PIN-u). Kopia zapasowa i przywracanie są w Zapleczu
-  // (zakładka „Kopia zapasowa”, Darek 8.11.2026); pozostałe narzędzia — moduły, jak Kiosk.
-  document.querySelector("#content").innerHTML = `
-    <section class="admin-card ports-card">
-      <div class="panel-heading"><div><span class="eyebrow">Sieć</span><h2>Wyszukiwanie i test portów</h2></div></div>
-      <div id="portTool"></div>
-    </section>
-  `;
-  renderPortTool();
+// Kafle aktualizacji w Statusie serwera — tylko informacja i odnośnik do miejsca, gdzie się
+// aktualizuje (Darek 9.11.2026). Aktualizowanie aplikacji: Zaplecze → Aplikacje → Aktualizacje.
+function statusUpdateTile(icon, title, level, text, link) {
+  return `
+    <article class="status-update-tile is-${level}">
+      <header>${uiIcon(icon, 20)}<h3>${escapeHtml(title)}</h3></header>
+      <p>${text}</p>
+      ${link}
+    </article>`;
+}
+
+async function loadStatusUpdates() {
+  const box = document.querySelector("#statusUpdates");
+  if (!box) return;
+  const api = dashboardConfig.apiUrl;
+  const [os, server, apps] = await Promise.allSettled([
+    request(`${api}/api/system/updates`),
+    request(`${api}/api/system/if-server`),
+    request(`${api}/api/docker/versions`)
+  ]);
+  if (!document.querySelector("#statusUpdates")) return;
+  const host = dashboardConfig.defaultHost || window.location.hostname;
+  const plural = (n, one, few, many) => (n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
+
+  // Debian (pakiety systemowe) — instalacja w Cockpit.
+  let osTile;
+  const cockpit = `<a class="status-update-link" href="https://${escapeHtml(host)}:9090" target="_blank" rel="noopener">Otwórz Cockpit ${uiIcon("external", 13)}</a>`;
+  if (os.status !== "fulfilled" || !os.value.available) {
+    osTile = statusUpdateTile("terminal", "Debian", "info", "Serwer nie podaje jeszcze listy aktualizacji.", cockpit);
+  } else {
+    const n = (os.value.packages || []).length;
+    const sec = os.value.securityCount || 0;
+    const stale = os.value.stale ? " Lista ma ponad 2 dni." : "";
+    osTile = n
+      ? statusUpdateTile("terminal", "Debian", "warn", `${n} ${plural(n, "pakiet", "pakiety", "pakietów")} do aktualizacji${sec ? `, w tym ${sec} bezpieczeństwa` : ""}.${stale}`, cockpit)
+      : statusUpdateTile("terminal", "Debian", "ok", `Pakiety systemowe są aktualne.${stale}`, cockpit);
+  }
+
+  // Program serwera — aktualizuje się w terminalu: sudo if-server → aktualizuj.
+  let serverTile;
+  const s = server.status === "fulfilled" ? server.value : {};
+  if (!s.installed || !s.latest) {
+    serverTile = statusUpdateTile("monitor", "IF-home-server", "info", `Zainstalowana: ${escapeHtml(s.installed || "nieznana")}${s.latest ? `, najnowsza: ${escapeHtml(s.latest)}` : ""}.`, "");
+  } else if (s.upToDate) {
+    serverTile = statusUpdateTile("monitor", "IF-home-server", "ok", `Wersja ${escapeHtml(s.installed)} — aktualna.`, "");
+  } else {
+    serverTile = statusUpdateTile("monitor", "IF-home-server", "warn", `Jest nowsza wersja: ${escapeHtml(s.latest)} (masz ${escapeHtml(s.installed)}).`,
+      `<span class="status-update-link is-hint">W terminalu serwera: <code>sudo if-server</code> → aktualizuj</span>`);
+  }
+
+  // Aplikacje (kontenery) — aktualizowanie w Zapleczu.
+  let appsTile;
+  const appsLink = `<a class="status-update-link" href="./mods/admin/?tab=apps">Przejdź do Aktualizacji aplikacji →</a>`;
+  if (apps.status !== "fulfilled") {
+    appsTile = statusUpdateTile("container", "Aplikacje", "info", "Nie udało się sprawdzić wersji aplikacji.", appsLink);
+  } else {
+    const list = (apps.value.versions || []).filter((v) => !v.local);
+    const patch = list.filter((v) => v.latestPatch).length;
+    const major = list.filter((v) => v.latestMajor).length;
+    const parts = [];
+    if (patch) parts.push(`${patch} ${plural(patch, "poprawka", "poprawki", "poprawek")}`);
+    if (major) parts.push(`${major} ${plural(major, "większa zmiana", "większe zmiany", "większych zmian")}`);
+    appsTile = parts.length
+      ? statusUpdateTile("container", "Aplikacje", "warn", `Nowsze wersje: ${parts.join(", ")}.`, appsLink)
+      : statusUpdateTile("container", "Aplikacje", "ok", `Wszystkie aplikacje są aktualne (${list.length}).`, appsLink);
+  }
+
+  box.innerHTML = osTile + serverTile + appsTile;
 }
 
 // ─── Pasek postępu kopii na górze strony (jak pasek alarmów) ─────────────────
@@ -1460,97 +1500,8 @@ async function refreshBackupBar(soon = false) {
   backupBarTimer = setTimeout(() => refreshBackupBar(), running ? 3000 : 60000);
 }
 
-function renderAlertsPage() {
-  stopStatusTopDiagnostics();
-  document.querySelector("#viewTitle").textContent = "Alerty";
-  document.querySelector("#toolbarActions").innerHTML = `
-    <button type="button" class="primary" id="btnRefreshAlerts">Odśwież</button>
-  `;
-  document.querySelector("#content").innerHTML = `
-    <section class="admin-card alerts-status-card">
-      <div class="panel-heading">
-        <div><span class="eyebrow">Diagnostyka</span><h2>Centrum alertów</h2></div>
-        <div class="panel-heading-actions"><a href="./mods/admin/?tab=alerts">Pełny widok w Zapleczu →</a></div>
-      </div>
-      <div id="serverStatusAlerts" style="display:grid; gap:10px;"><div class="empty">Pobieranie stanu alertów...</div></div>
-    </section>
-  `;
-  renderAlertsInto("#serverStatusAlerts");
-  document.querySelector("#btnRefreshAlerts")?.addEventListener("click", () => renderAlertsInto("#serverStatusAlerts"));
-}
-
 function renderAdmin() {
   renderServerStatus();
-}
-
-function renderPortTool() {
-  const target = document.querySelector("#portTool");
-  target.innerHTML = `
-    <div class="port-layout">
-      <label>Kategoria<select id="hintCategory">${Object.entries(PORT_HINTS).map(([id, hint]) => `<option value="${id}">${hint.label}</option>`).join("")}</select></label>
-      <div class="port-result is-info" id="hintResult"></div>
-      <label>Host<input id="checkHost" value="${dashboardConfig.defaultHost}"></label>
-      <label>Port hosta<input id="checkPort" inputmode="numeric" placeholder="3050"></label>
-      <button class="primary" id="checkPortButton" type="button">Sprawdź port</button>
-      <div class="port-result" id="portResult"><strong>Czeka</strong><span>Wpisz host i port.</span></div>
-    </div>
-  `;
-  const category = document.querySelector("#hintCategory");
-  const renderHint = () => {
-    const hint = PORT_HINTS[category.value];
-    const typicalText = hint.typicalPorts && hint.typicalPorts.length ? ` | Przykłady w tej puli: ${hint.typicalPorts.join(", ")}` : "";
-    const descText = hint.description ? ` (${hint.description})` : "";
-    setPortResult(document.querySelector("#hintResult"), "is-info", hint.label, `Pula hosta: ${hint.range}${typicalText}${descText}`);
-  };
-  category.addEventListener("change", renderHint);
-  document.querySelector("#checkPortButton").addEventListener("click", runPortCheck);
-  renderHint();
-}
-
-function setPortResult(box, tone, title, message) {
-  box.className = `port-result ${tone}`;
-  box.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(message)}</span>`;
-}
-
-async function checkPortAvailability(host, port) {
-  const payload = {
-    category: "manual",
-    hostPort: port,
-    containerPort: 80,
-    host,
-    port
-  };
-  return request(`${dashboardConfig.apiUrl}/api/ports/check`, { method: "POST", body: JSON.stringify(payload) });
-}
-
-async function runPortCheck() {
-  const host = document.querySelector("#checkHost").value.trim();
-  const rawPort = document.querySelector("#checkPort").value.trim();
-  const port = Number(rawPort);
-  const box = document.querySelector("#portResult");
-  if (!host) return setPortResult(box, "is-error", "Brak hosta", "Wpisz adres IP albo nazwę hosta.");
-  if (rawPort === "" || !Number.isInteger(port) || port < 1 || port > 65535) {
-    return setPortResult(box, "is-error", "Niepoprawny port", "Port TCP/UDP musi mieć zakres 1–65535.");
-  }
-  const button = document.querySelector("#checkPortButton");
-  button.disabled = true;
-  setPortResult(box, "is-pending", "Sprawdzam", `${host}:${port}`);
-  try {
-    const data = await checkPortAvailability(host, port);
-    const status = data.status || data.result || data.state;
-    if (["busy", "used", "occupied", "open"].includes(status) || data.busy === true || data.open === true) {
-      return setPortResult(box, "is-busy", "Port zajęty", `${host}:${port}`);
-    }
-    if (["free", "available", "closed"].includes(status) || data.busy === false || data.open === false) {
-      return setPortResult(box, "is-free", "Port wolny", `${host}:${port}`);
-    }
-    if (data.ok === true) return setPortResult(box, "is-free", "Port sprawdzony", `${host}:${port}`);
-    setPortResult(box, "is-error", "Nieznany status", "Backend nie zwrócił rozpoznawanego statusu.");
-  } catch (error) {
-    setPortResult(box, "is-error", "Błąd sprawdzania", error.message);
-  } finally {
-    button.disabled = false;
-  }
 }
 
 function loadDismissedAlerts() {

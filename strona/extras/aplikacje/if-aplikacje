@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+# if-aplikacje — zakładanie aplikacji z Instalatora strony startowej (Zaplecze → Aplikacje → Instalator).
+#
+# Strona (kontener) nie widzi folderu app-data ani nie powinna zakładać folderów jako root.
+# Dlatego robi to serwer: strona zostawia w swoim folderze config/ „karteczkę”
+# aplikacje-zlecenie.json, zadanie systemd if-aplikacje.path ją zauważa i uruchamia ten skrypt.
+#
+# Pliki w folderze config strony:
+#   aplikacje-zlecenie.json ← strona: {"akcja": "zaloz", "nazwa": "...", "compose": "...", "env": "..."}
+#   aplikacje-stan.json     → serwer: wynik (trwa / gotowe / blad) i opis dla człowieka
+#
+# Akcja „zaloz”:
+#   1. compose (i .env) zapisany w folderze tymczasowym i sprawdzony: docker compose config,
+#   2. ~/docker/app/<nazwa> z compose.yaml (i .env) — właściciel: użytkownik, nie root,
+#   3. foldery danych z compose, które leżą w ~/docker/app-data/<nazwa> — też użytkownika.
+# Aplikacji nie uruchamia (to robi użytkownik w Dockge). Niczego nie nadpisuje.
+#
+# Użycie (jako root, z if-aplikacje.service):
+#   if-aplikacje obsluz /home/{user}/docker/app-data/if-startpage/config [kolejny folder config ...]
+#   {user} — twoja nazwa użytkownika
+#
+import json
+import os
+import pwd
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from datetime import datetime
+
+NAZWA_APLIKACJI = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
+
+
+class Blad(Exception):
+    """Błąd z komunikatem dla człowieka (trafia na stronę)."""
+
+
+def teraz():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def zapisz_json(sciezka, dane):
+    """Zapis przez plik tymczasowy — strona nigdy nie widzi połowy pliku; właściciel jak folderu."""
+    folder = os.path.dirname(sciezka)
+    fd, tmp = tempfile.mkstemp(dir=folder, prefix=".tmp-", suffix=".json")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(dane, f, ensure_ascii=False, indent=2)
+    os.chmod(tmp, 0o644)
+    st = os.stat(folder)
+    try:
+        os.chown(tmp, st.st_uid, st.st_gid)
+    except OSError:
+        pass
+    os.replace(tmp, sciezka)
+
+
+def czytaj_json(sciezka):
+    try:
+        with open(sciezka, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def wlasciciel(config):
+    """Użytkownik serwera = właściciel folderu ~/docker/app (uid, gid, katalog domowy)."""
+    st = os.stat(config)
+    try:
+        dom = pwd.getpwuid(st.st_uid).pw_dir
+    except KeyError:
+        dom = os.path.abspath(os.path.join(config, "..", "..", "..", ".."))
+    app = os.path.join(dom, "docker", "app")
+    st = os.stat(app if os.path.isdir(app) else config)
+    return dom, st.st_uid, st.st_gid
+
+
+def oddaj(sciezka, uid, gid):
+    try:
+        os.chown(sciezka, uid, gid)
+    except OSError:
+        pass
+
+
+def zaloz(config, zlecenie):
+    nazwa = str(zlecenie.get("nazwa") or "")
+    if not NAZWA_APLIKACJI.match(nazwa):
+        raise Blad("Niepoprawna nazwa aplikacji.")
+    dom, uid, gid = wlasciciel(config)
+    folder_app = os.path.join(dom, "docker", "app", nazwa)
+    folder_danych = os.path.join(dom, "docker", "app-data", nazwa)
+    if os.path.exists(folder_app):
+        raise Blad(f"Aplikacja „{nazwa}” już jest na serwerze (folder app/{nazwa}). Niczego nie zmieniam.")
+
+    compose = str(zlecenie.get("compose") or "")
+    env = str(zlecenie.get("env") or "")
+    tymczasowy = tempfile.mkdtemp(prefix=f".if-instalator-{nazwa}-", dir=os.path.join(dom, "docker", "app"))
+    try:
+        with open(os.path.join(tymczasowy, "compose.yaml"), "w", encoding="utf-8") as f:
+            f.write(compose if compose.endswith("\n") else compose + "\n")
+        if env.strip():
+            with open(os.path.join(tymczasowy, ".env"), "w", encoding="utf-8") as f:
+                f.write(env if env.endswith("\n") else env + "\n")
+
+        # Sprawdzenie compose przez Dockera (nic nie uruchamia) i lista folderów z danymi.
+        # Jako użytkownik, nie root: compose z „env_file” czy „extends” wskazującym np. /etc/shadow
+        # nie przeczyta plików, do których użytkownik nie ma dostępu.
+        polecenie = ["docker", "compose", "--project-name", nazwa, "--project-directory", tymczasowy,
+                     "-f", os.path.join(tymczasowy, "compose.yaml"), "config", "--format", "json"]
+        oddaj(tymczasowy, uid, gid)
+        for plik in os.listdir(tymczasowy):
+            oddaj(os.path.join(tymczasowy, plik), uid, gid)
+        if os.geteuid() == 0:
+            polecenie = ["runuser", "-u", pwd.getpwuid(uid).pw_name, "--"] + polecenie
+        wynik = subprocess.run(polecenie, capture_output=True, text=True, timeout=60)
+        if wynik.returncode != 0:
+            opis = (wynik.stderr or wynik.stdout).strip().splitlines()
+            ostatnia = (opis[-1] if opis else "nieznany błąd").replace(tymczasowy + os.sep, "")
+            raise Blad("Docker nie przyjął compose: " + ostatnia)
+        konfiguracja = json.loads(wynik.stdout or "{}")
+        foldery = set()
+        for usluga in (konfiguracja.get("services") or {}).values():
+            for wolumen in usluga.get("volumes") or []:
+                zrodlo = wolumen.get("source") or ""
+                if wolumen.get("type") == "bind" and (zrodlo == folder_danych or zrodlo.startswith(folder_danych + "/")):
+                    foldery.add(zrodlo)
+
+        # Foldery danych — tylko w app-data/<nazwa>, właściciel: użytkownik.
+        os.makedirs(os.path.dirname(folder_danych), exist_ok=True)
+        for folder in sorted({folder_danych, *foldery}):
+            wzgledna = os.path.relpath(folder, folder_danych)
+            czesci = [] if wzgledna == "." else wzgledna.split(os.sep)
+            for i in range(len(czesci) + 1):
+                kolejny = os.path.join(folder_danych, *czesci[:i])
+                if not os.path.isdir(kolejny):
+                    os.makedirs(kolejny)
+                    oddaj(kolejny, uid, gid)
+
+        for plik in os.listdir(tymczasowy):
+            oddaj(os.path.join(tymczasowy, plik), uid, gid)
+        if os.path.exists(os.path.join(tymczasowy, ".env")):
+            os.chmod(os.path.join(tymczasowy, ".env"), 0o600)   # hasła — tylko dla użytkownika
+        oddaj(tymczasowy, uid, gid)
+        os.chmod(tymczasowy, 0o755)
+        os.rename(tymczasowy, folder_app)
+        return sorted(os.path.relpath(f, os.path.dirname(folder_danych)) for f in {folder_danych, *foldery})
+    finally:
+        if os.path.isdir(tymczasowy):
+            shutil.rmtree(tymczasowy, ignore_errors=True)
+
+
+def obsluz(config):
+    """Uruchamiane przez if-aplikacje.path, gdy strona zostawi karteczkę."""
+    zlecenie_plik = os.path.join(config, "aplikacje-zlecenie.json")
+    zlecenie = czytaj_json(zlecenie_plik) or {}
+    try:
+        os.remove(zlecenie_plik)
+    except OSError:
+        pass
+    akcja = zlecenie.get("akcja")
+    stan_plik = os.path.join(config, "aplikacje-stan.json")
+    if akcja == "zaloz":
+        nazwa = zlecenie.get("nazwa")
+        try:
+            foldery = zaloz(config, zlecenie)
+            zapisz_json(stan_plik, {
+                "stan": "gotowe", "nazwa": nazwa, "foldery": foldery, "czas": teraz(),
+                "komunikat": f"Aplikacja „{nazwa}” jest przygotowana: compose w app/{nazwa}, dane w app-data/{nazwa}. Uruchom ją w Dockge („Deploy”)."})
+        except Blad as e:
+            zapisz_json(stan_plik, {"stan": "blad", "nazwa": nazwa, "komunikat": str(e), "czas": teraz()})
+        except Exception as e:  # nieoczekiwany błąd — opis na stronę, szczegóły w dzienniku
+            print(f"if-aplikacje: {e!r}", file=sys.stderr)
+            zapisz_json(stan_plik, {"stan": "blad", "nazwa": nazwa, "czas": teraz(),
+                                    "komunikat": f"Nieoczekiwany błąd: {e}. Szczegóły: journalctl -u if-aplikacje"})
+    elif akcja:
+        print(f"if-aplikacje: nieznana akcja „{akcja}”", file=sys.stderr)
+
+
+def main():
+    if len(sys.argv) < 3 or sys.argv[1] != "obsluz":
+        print("Użycie: if-aplikacje obsluz /home/{user}/docker/app-data/if-startpage/config [...]", file=sys.stderr)
+        return 2
+    # Kilka folderów config (np. strona i jej wersja testowa) — każdy obsługiwany osobno.
+    for config in sys.argv[2:]:
+        if not os.path.isdir(config):
+            print(f"if-aplikacje: pomijam {config} — nie ma takiego folderu", file=sys.stderr)
+            continue
+        obsluz(config)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

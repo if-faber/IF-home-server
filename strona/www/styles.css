@@ -976,3 +976,18 @@ dialog.if-confirm { width: min(440px, calc(100vw - 28px)); }
 .incident-bar.backup { background: #0f766e; border-color: #5eead4; color: #ffffff; }
 .backup-progress { display: block; height: 6px; margin-top: 6px; border-radius: 999px; background: rgb(255 255 255 / 0.3); overflow: hidden; }
 .backup-progress > span { display: block; height: 100%; background: #ffffff; transition: width .5s ease; }
+/* Status serwera: pod statystykami — procesy (Top), na całą szerokość. */
+.status-top-card { grid-column: 1 / -1; margin-top: var(--card-gap); }
+/* Status serwera: kafle aktualizacji — tylko informacja i odnośnik (Darek 9.11.2026). */
+.status-updates-card { grid-column: 1 / -1; margin-top: var(--card-gap); }
+.status-updates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--card-gap); }
+.status-update-tile { display: grid; align-content: start; gap: 8px; padding: 16px; border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: calc(var(--card-radius) - 5px); background: rgb(var(--admin-panel-rgb) / max(var(--admin-panel-alpha), 0.12)); }
+.status-update-tile.is-ok { border-left-color: #10b981; }
+.status-update-tile.is-warn { border-left-color: #f59e0b; }
+.status-update-tile header { display: flex; align-items: center; gap: 8px; }
+.status-update-tile h3 { margin: 0; color: var(--text); font-size: 16px; }
+.status-update-tile p { margin: 0; color: var(--text); font-size: 13px; line-height: 1.5; }
+.status-update-link { color: var(--accent); font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.status-update-link:hover { text-decoration: underline; }
+.status-update-link.is-hint { color: var(--muted); font-weight: 500; display: block; }
+@media (max-width: 900px) { .status-updates { grid-template-columns: 1fr; } }

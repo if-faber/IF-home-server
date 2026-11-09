@@ -82,7 +82,7 @@
   function footerHtml({ withClose } = {}) {
     return `
       <menu class="top-modal-footer">
-        <span data-role="last-updated" style="color:var(--muted); font-size:12px;">Oczekiwanie na próbkę</span>
+        <span data-role="last-updated" style="color:var(--muted); font-size:var(--top-wyniki);">Oczekiwanie na próbkę</span>
         <div style="display:flex; gap:8px;">
           <button type="button" class="button" data-role="pause-btn">${uiIcon("pause", 16)} Pauza</button>
           <button type="button" class="button" data-role="refresh-btn">${uiIcon("refresh", 16)} Odśwież</button>
@@ -153,7 +153,7 @@
             <div class="top-core-bar">
               <div class="top-core-fill ${usage > 75 ? 'is-high' : ''}" style="width: ${usage}%"></div>
             </div>
-            <div style="font-size:11px; text-align:right; font-family:monospace; color:var(--muted);">${usage.toFixed(1)}%</div>
+            <div class="top-core-usage">${usage.toFixed(1)}%</div>
           </div>
         `;
       }).join("");

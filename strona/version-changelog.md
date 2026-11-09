@@ -5,6 +5,19 @@ druga cyfra wersji jest wspólna z serwerem, trzecia — poprawki samej strony.
 
 ---
 
+## v0.3.6 — 2026-11-09
+
+**Instalator aplikacji** i porządki na stronie — wersja do testów; po ukończeniu aktualizacji: v0.4.0.
+
+- **Zaplecze → Aplikacje → Instalator:** wklejasz compose aplikacji (i `.env`), „Dostosuj” pokazuje wersję dla serwera z listą zmian — dane w `app-data/<nazwa>` (obejmie je kopia zapasowa), stała wersja zamiast `latest`, wolne porty z puli, automatyczny start, strefa czasowa. „Zatwierdź” — serwer zakłada foldery i sprawdza compose (zadanie `if-aplikacje`, ustawia je `if-server`), potem Deploy w Dockge.
+- **Status serwera:** kafle aktualizacji (Debian, IF-home-server, aplikacje) — tylko informacja z odnośnikami; pod nimi Top (procesy). Zakładki Top, Alerty i Narzędzia usunięte (alerty w dzwonku).
+- **Zaplecze:** zakładka Aktualizacje → **Aplikacje** (podmenu Aktualizacje i Instalator); **Tester portów** jako moduł (Zaplecze → Moduły).
+- **Aktualizacje — poprawki:** aplikacje z bazą w tym samym compose (np. poczta, WordPress) i Dockge (`docker-compose.yml`) są znajdowane; nie jest już proponowana starsza wersja, gdy obraz podaje zamiast numeru kod „sha-…”; zrozumiały komunikat zamiast „Błąd serwera (kod 404)”; wersje z ghcr.io czytane z całej listy (wcześniej np. Immich v1.91.1 zamiast v3.x).
+- **Czytelność:** jedna, większa czcionka w panelu Top i w Centrum Alertów.
+- Nowa biblioteka: `yaml` 2.9.1 (ISC) — czytanie i zmiana compose z zachowaniem komentarzy.
+
+---
+
 ## v0.3.5 — 2026-11-09
 
 **Kopia zapasowa i przywracanie** (Zaplecze → Kopia zapasowa) — wersja do testów; po testach i ostatnich poprawkach: v0.4.0.

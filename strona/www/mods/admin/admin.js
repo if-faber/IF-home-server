@@ -2,7 +2,7 @@
 
 const state = {
   adminPin: null,
-  activeTab: "homepage", // helper, alerts, homepage, modules, kiosk, updates, admin-theme
+  activeTab: "homepage", // helper, alerts, homepage, modules, kiosk, apps, admin-theme
   theme: {},
   settings: {},
 
@@ -12,14 +12,16 @@ const state = {
 
 window.state = state;
 
-const TAB_IDS = ["helper", "alerts", "live", "homepage", "modules", "kiosk", "updates", "backup", "admin-theme"];
+const TAB_IDS = ["helper", "alerts", "live", "homepage", "modules", "kiosk", "ports", "apps", "backup", "admin-theme"];
 
 // Zakładki-moduły dostępne wyłącznie przez hub "Moduły" (tab-modules.js) —
 // nie mają własnego przycisku w sidebarze, więc podświetlają przycisk "tab-modules".
-const MODULE_SUBTAB_IDS = ["kiosk"];
+const MODULE_SUBTAB_IDS = ["kiosk", "ports"];
 
 // Tab Switching Router
 function switchTab(tabId) {
+  // Dawna zakładka „Aktualizacje” → Aplikacje (Darek 9.11.2026).
+  if (tabId === "updates") tabId = "apps";
   // Zakładki mogą uruchamiać własne odpytywanie na żywo (np. Statystyki Live);
   // sprzątamy po poprzedniej zakładce, zanim podmienimy #tabContent.
   if (typeof window.__activeTabCleanup === "function") {
@@ -67,10 +69,14 @@ function switchTab(tabId) {
     setTabTitle("modules", "Kiosk Serwera — Ustawienia i Wygląd");
     content.innerHTML = renderKioskTab();
     bindKioskEvents();
-  } else if (tabId === "updates") {
-    setTabTitle("package", "Aktualizacje Systemu & Docker");
-    content.innerHTML = renderUpdatesTab();
-    bindUpdatesEvents();
+  } else if (tabId === "ports") {
+    setTabTitle("modules", "Tester portów");
+    content.innerHTML = renderPortsTab();
+    bindPortsEvents();
+  } else if (tabId === "apps") {
+    setTabTitle("package", "Aplikacje");
+    content.innerHTML = renderAppsTab();
+    bindAppsEvents();
   } else if (tabId === "backup") {
     setTabTitle("save", "Kopia zapasowa");
     content.innerHTML = renderBackupTab();
@@ -132,7 +138,7 @@ function init() {
   // Obsługa bezpośredniego przejścia z URL np. ?tab=alerts lub #alerts
   const urlParams = new URLSearchParams(window.location.search);
   const requestedTab = urlParams.get("tab") || window.location.hash.replace("#", "");
-  if (requestedTab && TAB_IDS.includes(requestedTab)) {
+  if (requestedTab && (TAB_IDS.includes(requestedTab) || requestedTab === "updates")) {
     state.activeTab = requestedTab;
     sessionStorage.setItem("homedash.admin.activeTab", requestedTab);
   }

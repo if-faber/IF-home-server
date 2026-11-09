@@ -19,7 +19,7 @@ strony (0.3.1, 0.3.2…).
 ## Funkcje
 
 - **Strona Główna** — własne strony w menu (Home + dowolne, np. Ulubione), na nich sekcje
-  z kafelkami linków, stałe strony serwera (Status, Top, Narzędzia, Alerty), tryb dzień/noc
+  z kafelkami linków, stała strona serwera (Status serwera z aktualizacjami i procesami — Top; alerty w dzwonku; tester portów w Zapleczu → Moduły), tryb dzień/noc
   (przełącznik ☀️/🌙 na dole paska bocznego), menu ⚙️ w pasku bocznym (wygląd na żywo,
   Zaplecze, blokada edycji), menu ⚙️ na dole strony (dodaj link, dodaj sekcję, Zarządzanie),
   chowany pasek boczny, kafelki CPU i RAM w nagłówku (kolor wg progów) i dzwonek alertów.
@@ -30,9 +30,11 @@ strony (0.3.1, 0.3.2…).
     progi temperatur dla każdego czujnika i progi obciążenia CPU/RAM,
   - Statystyki Live — CPU, temperatury wszystkich czujników, RAM, dyski, sieć, procesy,
   - Strony i sekcje — dodawanie, nazwy, kolejność i usuwanie stron, sekcji i linków,
-  - Aktualizacje kontenerów — porównuje wersje obrazów z najnowszymi stabilnymi
+  - Aplikacje → Aktualizacje — porównuje wersje obrazów z najnowszymi stabilnymi
     i podmienia tag wersji w `compose.yaml` wybranego stosu,
-  - Moduły (ustawienia Kiosku), edytor wyglądu Zaplecza (osobno dzień i noc).
+  - Aplikacje → Instalator — dostosowuje compose aplikacji do serwera i zakłada ją,
+  - Kopia zapasowa i przywracanie,
+  - Moduły (Kiosk, Tester portów), edytor wyglądu Zaplecza (osobno dzień i noc).
 - **Kiosk statusu serwera** — Status serwera, Live (zużycie per kontener),
   Status kontenerów, Radio.
 
@@ -72,7 +74,7 @@ ghcr.io/if-faber/if-startpage:vX.Y.Z
 Program pyta o PIN, zakłada stos `if-startpage` w Dockge z właściwymi ścieżkami i uruchamia
 stronę pod adresem `http://adres-serwera/`. Instrukcja całości: README projektu IF-home-server.
 
-**Aktualizacja strony:** Zaplecze → Aktualizacje → przy `if-startpage` „Aktualizuj compose”,
+**Aktualizacja strony:** Zaplecze → Aplikacje → Aktualizacje → przy `if-startpage` „Aktualizuj compose”,
 potem „Aktualizuj” w Dockge. Przy aktualizacji serwera (`sudo if-server` → aktualizuj → Upgrade)
 strona starsza niż wersja wydana razem z serwerem jest aktualizowana sama; nowszej nie rusza.
 
@@ -168,7 +170,13 @@ Ikony:    np. jellyseerr.png, immich.png
 Licencje ikon dołączonych do IF-startpage (dashboard-icons, Lucide) są w
 [THIRD-PARTY.md](THIRD-PARTY.md).
 
-## Aktualizacje aplikacji (Zaplecze → Aktualizacje)
+## Aktualizacje w Statusie serwera
+
+Na Stronie Głównej → Status serwera trzy kafle, tylko do czytania: **Debian** (ile pakietów czeka,
+odnośnik do Cockpit), **IF-home-server** (wersja i jak zaktualizować), **Aplikacje** (ile poprawek
+i większych zmian, odnośnik do Zaplecza).
+
+## Aktualizacje aplikacji (Zaplecze → Aplikacje → Aktualizacje)
 
 Tabela pokazuje dla każdej aplikacji (kontenera) zainstalowaną i najnowszą wersję.
 
@@ -197,7 +205,7 @@ Coś poszło nie tak? **„Cofnij”** przywraca `compose.yaml` z ostatniej kopi
 ### Aktualizacje Debiana (pakiety systemowe)
 
 Kontener IF-startpage nie widzi pakietów serwera. Dlatego serwer raz dziennie zapisuje
-listę oczekujących aktualizacji do pliku, a IF-startpage ją pokazuje (Zaplecze → Aktualizacje
+listę oczekujących aktualizacji do pliku, a IF-startpage ją pokazuje (Status serwera
 i dzwonek: „Aktualizacje systemu: N”). **Instalujesz je w Cockpit** (Aktualizacje oprogramowania).
 Po każdej instalacji lub aktualizacji pakietów lista odświeża się sama w ciągu minuty (plik
 `99if-system-updates` w ustawieniach apt) — nie trzeba czekać do następnego dnia.
@@ -208,8 +216,17 @@ Pliki zadania: `strona/extras/system-updates/`.
 
 ### Program serwera (IF-home-server)
 
-Między pakietami systemowymi a kontenerami jest linijka **IF-home-server**: zainstalowana
+Kafel **IF-home-server** w Statusie serwera: zainstalowana
 i najnowsza wersja programu serwera. Nowszą instalujesz w terminalu: `sudo if-server` → aktualizuj.
+
+## Instalator aplikacji (Zaplecze → Aplikacje → Instalator)
+
+Wklejasz compose z repozytorium aplikacji (i jej `.env`, jeśli ma). **„Dostosuj”** pokazuje compose
+dla serwera z listą zmian: dane w `~/docker/app-data/<nazwa>` (obejmie je kopia zapasowa), stała
+wersja zamiast `latest`, wolne porty z puli wybranego rodzaju aplikacji, automatyczny start,
+strefa czasowa. **„Zatwierdź”** — serwer (zadanie `if-aplikacje`, ustawia je `if-server`) zakłada
+foldery z prawami użytkownika, zapisuje compose i sprawdza go; aplikację uruchamiasz w Dockge.
+Nazwa, która już jest, jest odrzucana — nic nie jest nadpisywane.
 
 ## Kopia zapasowa (Zaplecze → Kopia zapasowa)
 

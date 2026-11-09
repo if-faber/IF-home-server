@@ -6,6 +6,7 @@ const net = require("net");
 const os = require("os");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
+const YAML = require("yaml");
 
 const execFileAsync = promisify(execFile);
 
@@ -470,6 +471,24 @@ function resolveStackAndService(containerName) {
   return DOCKER_STACK_OVERRIDES[containerName] || { stack: containerName, service: containerName };
 }
 
+// Stos i serwis z etykiet Compose (folder stosu i nazwa serwisu) — nazwa kontenera bywa inna
+// niż stos (np. kontener „omnivoice-studio” w stosie „omnivoices”, serwis „omnivoice”).
+async function containerStackAndService(containerName) {
+  if (DOCKER_STACK_OVERRIDES[containerName]) return DOCKER_STACK_OVERRIDES[containerName];
+  if (isSafeName(containerName)) {
+    try {
+      const { stdout } = await execFileAsync("docker", [
+        "inspect", "--format",
+        '{{index .Config.Labels "com.docker.compose.project.working_dir"}}|{{index .Config.Labels "com.docker.compose.service"}}',
+        containerName
+      ], { timeout: 4000 });
+      const [dir, service] = stdout.trim().split("|");
+      if (dir && service && !stdout.includes("<no value>")) return { stack: path.basename(dir), service };
+    } catch {}
+  }
+  return resolveStackAndService(containerName);
+}
+
 const UNSTABLE_TAG_HINTS = /(alpha|beta|rc\d*|dev|nightly|edge|preview|snapshot|canary|insider|unstable|master|testing)/i;
 const STABLE_TAG_RE = /^v?\d+(\.\d+){0,3}$/;
 
@@ -543,13 +562,19 @@ async function fetchOciRegistryToken(host, repository) {
 async function fetchOciStableTags(host, repository) {
   const token = await fetchOciRegistryToken(host, repository);
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`https://${host}/v2/${repository}/tags/list`, {
-    headers,
-    signal: AbortSignal.timeout(6000)
-  });
-  if (!res.ok) throw new Error(`Registry HTTP ${res.status}`);
-  const data = await res.json();
-  const tags = (data.tags || []).filter(isStableTag);
+  // Rejestr podaje wersje stronami (np. ghcr.io) — bez kolejnych stron najnowsze wersje
+  // nie były widoczne (Immich: v1.91.1 zamiast v2.x). Następna strona: nagłówek Link.
+  const all = [];
+  let url = `https://${host}/v2/${repository}/tags/list?n=1000`;
+  for (let page = 0; url && page < 30; page++) {
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(6000) });
+    if (!res.ok) throw new Error(`Registry HTTP ${res.status}`);
+    const data = await res.json();
+    all.push(...(data.tags || []));
+    const next = (res.headers.get("link") || "").match(/<([^>]+)>\s*;\s*rel="?next"?/);
+    url = next ? new URL(next[1], `https://${host}`).toString() : null;
+  }
+  const tags = all.filter(isStableTag);
   return tags.sort(compareVersionTags);
 }
 
@@ -2144,11 +2169,12 @@ async function collectVersions({ force = false } = {}) {
     .filter((c) => !DOCKER_VERSION_EXCLUDE.has(c.name));
 
   return Promise.all(running.map(async (c) => {
-    const { stack, service } = resolveStackAndService(c.name);
+    const { stack, service } = await containerStackAndService(c.name);
     const lastSegment = c.image.split("/").pop();
     const installedTag = lastSegment.includes(":") ? lastSegment.split(":").pop() : "latest";
     const [installedLabel, local] = await Promise.all([getInstalledVersionLabel(c.name), isLocalImage(c.image)]);
-    const installedVersion = installedLabel || (isStableTag(installedTag) ? installedTag : null);
+    // Etykieta wersji obrazu tylko, gdy to numer (np. „sha-beeaae0” nim nie jest — wtedy numer z tagu).
+    const installedVersion = (isStableTag(installedLabel) ? installedLabel : null) || (isStableTag(installedTag) ? installedTag : null);
     const base = {
       container: c.name,
       stack,
@@ -2235,7 +2261,56 @@ function backupCompose(stack, composePath) {
   return target;
 }
 
-app.post("/api/docker/update-compose", requirePin, (req, res) => {
+// Plik compose stosu — te same nazwy, które czyta Docker Compose (np. Dockge ma docker-compose.yml).
+const COMPOSE_FILE_NAMES = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
+
+function findComposeFile(stack) {
+  for (const name of COMPOSE_FILE_NAMES) {
+    const file = path.join(HOST_APPS_DIR, stack, name);
+    if (fs.existsSync(file)) return file;
+  }
+  return null;
+}
+
+// Nowy tag obrazu dla jednego serwisu w compose — także gdy w stosie jest kilka serwisów
+// (np. aplikacja + baza „db”). Wcięcia dowolne (2 lub 4 spacje), komentarze i cudzysłowy zostają.
+function setServiceImageTag(original, service, newTag) {
+  const lines = original.split("\n");
+  const indentOf = (line) => line.match(/^\s*/)[0].length;
+  const isContent = (line) => line.trim() && !line.trim().startsWith("#");
+  let inServices = false;
+  let serviceIndent = null;
+  let inTarget = false;
+  let updated = false;
+
+  const out = lines.map((line) => {
+    if (!isContent(line)) return line;
+    const indent = indentOf(line);
+    if (indent === 0) {
+      inServices = /^services:\s*(#.*)?\r?$/.test(line);
+      inTarget = false;
+      return line;
+    }
+    if (!inServices) return line;
+    if (serviceIndent === null) serviceIndent = indent;
+    if (indent <= serviceIndent) {
+      const key = line.match(/^\s*["']?([^"'\s#:]+)["']?\s*:\s*(#.*)?\r?$/);
+      inTarget = Boolean(key) && key[1] === service;
+      return line;
+    }
+    if (!inTarget || updated) return line;
+    const image = line.match(/^(\s*image:\s*)(["']?)([^"'\s#]+)\2([\s\S]*)$/);
+    if (!image) return line;
+    const ref = image[3].split("@")[0];
+    const colon = ref.indexOf(":", ref.lastIndexOf("/") + 1);
+    const repo = colon >= 0 ? ref.slice(0, colon) : ref;
+    updated = true;
+    return `${image[1]}${image[2]}${repo}:${newTag}${image[2]}${image[4]}`;
+  });
+  return { text: out.join("\n"), updated };
+}
+
+app.post("/api/docker/update-compose", requirePin, async (req, res) => {
   try {
     const container = normalizeText(req.body?.container);
     const newTag = normalizeText(req.body?.tag);
@@ -2248,66 +2323,35 @@ app.post("/api/docker/update-compose", requirePin, (req, res) => {
       return res.status(400).json({ ok: false, message: "Niepoprawny numer wersji." });
     }
 
-    const { stack, service } = resolveStackAndService(container);
+    const { stack, service } = await containerStackAndService(container);
     if (!isSafeName(stack) || !isSafeName(service)) {
       return res.status(400).json({ ok: false, message: "Niepoprawna nazwa kontenera lub stosu." });
     }
-    const composePath = path.join(HOST_APPS_DIR, stack, "compose.yaml");
+    const composePath = findComposeFile(stack);
 
-    if (!fs.existsSync(composePath)) {
+    if (!composePath) {
       return res.status(404).json({
         ok: false,
-        message: `Nie znaleziono ${composePath}. Sprawdź, czy w compose.yaml IF-startpage jest wolumen "/home/{user}/docker/app:/host-apps" ({user} — twoja nazwa użytkownika).`
+        message: `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}. Sprawdź, czy w compose.yaml IF-startpage jest wolumen "/home/{user}/docker/app:/host-apps" ({user} — twoja nazwa użytkownika).`
       });
     }
 
     const original = fs.readFileSync(composePath, "utf8");
-    const lines = original.split(/\r?\n/);
-
-    let inTargetService = false;
-    let serviceIndent = null;
-    let updated = false;
-
-    const newLines = lines.map((line) => {
-      const serviceMatch = line.match(/^(\s\s)(\S[^:]*):\s*$/);
-      if (serviceMatch) {
-        inTargetService = serviceMatch[2] === service;
-        serviceIndent = serviceMatch[1].length;
-        return line;
-      }
-
-      if (inTargetService) {
-        const indentMatch = line.match(/^(\s*)/);
-        const indent = indentMatch[1].length;
-
-        if (line.trim() && indent <= serviceIndent) {
-          inTargetService = false;
-        } else {
-          const imageMatch = line.match(/^(\s*image:\s*)(\S+)(\s*)$/);
-          if (imageMatch) {
-            const repo = imageMatch[2].split(":")[0];
-            updated = true;
-            return `${imageMatch[1]}${repo}:${newTag}${imageMatch[3]}`;
-          }
-        }
-      }
-
-      return line;
-    });
+    const { text, updated } = setServiceImageTag(original, service, newTag);
 
     if (!updated) {
       return res.status(404).json({
         ok: false,
-        message: `Nie znaleziono linii "image:" dla serwisu "${service}" w ${stack}/compose.yaml.`
+        message: `Nie znaleziono linii "image:" dla serwisu "${service}" w ${stack}/${path.basename(composePath)}.`
       });
     }
 
     backupCompose(stack, composePath);
-    fs.writeFileSync(composePath, newLines.join("\n"), "utf8");
+    fs.writeFileSync(composePath, text, "utf8");
 
     res.json({
       ok: true,
-      message: `Zapisano tag "${newTag}" w ${stack}/compose.yaml (serwis "${service}"). Restart stosu w Dockge, żeby zastosować zmianę.`
+      message: `Zapisano tag "${newTag}" w ${stack}/${path.basename(composePath)} (serwis "${service}"). Restart stosu w Dockge, żeby zastosować zmianę.`
     });
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message });
@@ -2315,12 +2359,13 @@ app.post("/api/docker/update-compose", requirePin, (req, res) => {
 });
 
 // „Cofnij” — przywraca compose.yaml z ostatniej kopii (kopia znika, więc kolejne „Cofnij” idzie dalej wstecz).
-app.post("/api/docker/compose-restore", requirePin, (req, res) => {
+app.post("/api/docker/compose-restore", requirePin, async (req, res) => {
   try {
     const container = normalizeText(req.body?.container);
-    const { stack } = resolveStackAndService(container);
+    const { stack } = await containerStackAndService(container);
     if (!isSafeName(stack)) return res.status(400).json({ ok: false, message: "Niepoprawna nazwa stosu." });
-    const composePath = path.join(HOST_APPS_DIR, stack, "compose.yaml");
+    const composePath = findComposeFile(stack);
+    if (!composePath) return res.status(404).json({ ok: false, message: `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}.` });
     const backups = listComposeBackups(stack);
     if (!backups.length) return res.status(404).json({ ok: false, message: `Brak kopii compose.yaml dla „${stack}”.` });
     const latest = path.join(composeBackupDir(stack), backups[backups.length - 1]);
@@ -2752,6 +2797,346 @@ app.get("/api/system/if-server", async (req, res) => {
     checkedAt: found.checkedAt,
     error: found.error || null
   });
+});
+
+// ─── Instalator aplikacji (Zaplecze → Aplikacje → Instalator, Darek 9.11.2026) ────────────
+// Strona dostosowuje wklejony compose do serwera IF (dane w app-data/<nazwa>, wersja zamiast
+// latest, wolne porty, restart, strefa czasowa) i pokazuje listę zmian. Foldery zakłada i compose
+// sprawdza serwer (zadanie if-aplikacje, „karteczka” aplikacje-zlecenie.json — jak kopia zapasowa).
+const APPS_REQUEST_FILE = path.join(CONFIG_DIR, "aplikacje-zlecenie.json");
+const APPS_STATE_FILE = path.join(CONFIG_DIR, "aplikacje-stan.json");
+const APP_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+const INSTALLER_TZ = "Europe/Warsaw";
+
+// Folder ~/docker na serwerze: źródło wolumenu /host-apps strony (…/docker/app) bez „/app”.
+let hostDockerDirCache = null;
+async function hostDockerDir() {
+  if (hostDockerDirCache) return hostDockerDirCache;
+  const { stdout } = await execFileAsync("docker", ["inspect", os.hostname(), "--format", "{{json .Mounts}}"], { timeout: 3000 });
+  const mount = (JSON.parse(stdout.trim() || "[]") || []).find((m) => m.Destination === HOST_APPS_DIR);
+  if (!mount?.Source) throw new Error(`Strona nie ma wolumenu ${HOST_APPS_DIR} — sprawdź compose strony.`);
+  hostDockerDirCache = path.dirname(mount.Source);
+  return hostDockerDirCache;
+}
+
+// Porty hosta zajęte przez działające kontenery i zapisane w compose wszystkich aplikacji
+// (także wyłączonych — po włączeniu pokłóciłyby się z nową). Wartość: kto zajmuje.
+function hostPortsOfService(service) {
+  const found = [];
+  for (const entry of Array.isArray(service?.ports) ? service.ports : []) {
+    if (entry && typeof entry === "object") {
+      const published = Number(String(entry.published ?? "").split("-")[0]);
+      if (published) found.push(published);
+      continue;
+    }
+    const parsed = parsePortEntry(String(entry));
+    if (parsed?.hostPort) found.push(parsed.hostPort);
+  }
+  return found;
+}
+
+async function collectUsedPorts() {
+  const used = new Map();
+  try {
+    const { stdout } = await execFileAsync("docker", ["ps", "--format", "{{.Names}}\t{{.Ports}}"], { timeout: 4000 });
+    for (const line of stdout.trim().split("\n").filter(Boolean)) {
+      const [name, ports = ""] = line.split("\t");
+      for (const m of ports.matchAll(/:(\d+)(?:-(\d+))?->/g)) {
+        const from = Number(m[1]);
+        const to = Number(m[2] || m[1]);
+        for (let p = from; p <= to && p - from < 200; p++) used.set(p, name);
+      }
+    }
+  } catch {}
+  let stacks = [];
+  try { stacks = fs.readdirSync(HOST_APPS_DIR); } catch {}
+  for (const stack of stacks) {
+    if (!isSafeName(stack)) continue;
+    const file = findComposeFile(stack);
+    if (!file) continue;
+    try {
+      const doc = YAML.parse(fs.readFileSync(file, "utf8")) || {};
+      for (const service of Object.values(doc.services || {})) {
+        for (const port of hostPortsOfService(service)) if (!used.has(port)) used.set(port, stack);
+      }
+    } catch {}
+  }
+  return used;
+}
+
+// „[ip:]host:kontener[/protokół]” → części; zakresy portów i sam port kontenera — null (bez zmian).
+function parsePortEntry(text) {
+  const m = String(text).trim().match(/^(?:(\[[^\]]+\]|[\d.]+):)?(\d+):(\d+)(\/(?:tcp|udp))?$/);
+  if (!m) return null;
+  return { ip: m[1] || "", hostPort: Number(m[2]), containerPort: m[3], proto: m[4] || "" };
+}
+
+function formatPortEntry(p) {
+  return `${p.ip ? `${p.ip}:` : ""}${p.hostPort}:${p.containerPort}${p.proto}`;
+}
+
+// Wartości z .env (KLUCZ=wartość) i zamiana jednej wartości z zachowaniem reszty pliku.
+function parseEnvText(text) {
+  const values = {};
+  for (const line of String(text || "").split("\n")) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (m) values[m[1]] = m[2].replace(/^(["'])(.*)\1$/, "$2");
+  }
+  return values;
+}
+
+function setEnvValue(text, key, value) {
+  return String(text).split("\n").map((line) => {
+    const m = line.match(/^(\s*(?:export\s+)?)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)(.*?)(\s*(#.*)?)$/);
+    return m && m[2] === key ? `${m[1]}${m[2]}${m[3]}${value}` : line;
+  }).join("\n");
+}
+
+// Ścieżka względna wyglądająca na plik (np. ./nginx.conf) — zostaje obok compose.
+function looksLikeFile(rel) {
+  const last = rel.replace(/\/+$/, "").split("/").pop() || "";
+  return !rel.endsWith("/") && /\.[A-Za-z0-9]{1,6}$/.test(last);
+}
+
+async function adaptCompose({ name, compose, env, range, host }) {
+  const changes = [];
+  const note = (text) => changes.push(text);
+  const doc = YAML.parseDocument(String(compose || ""), { prettyErrors: true });
+  if (doc.errors.length) throw new Error(`Compose ma błąd: ${doc.errors[0].message}`);
+  const services = doc.get("services");
+  if (!YAML.isMap(services) || !services.items.length) throw new Error("W compose nie ma części „services”.");
+
+  const appData = `${await hostDockerDir()}/app-data/${name}`;
+  let envText = String(env || "");
+  const envValues = parseEnvText(envText);
+  const topVolumes = doc.get("volumes");
+  const convertedVolumes = new Set();
+  const keptVolumes = new Set();
+
+  if (doc.has("version")) {
+    doc.delete("version");
+    note("Usunięto przestarzałą linijkę „version” — Docker jej już nie potrzebuje.");
+  }
+
+  // Wolumen → pełna ścieżka w app-data/<nazwa>; null = bez zmian.
+  const adaptSource = (source, serviceName) => {
+    const src = String(source);
+    if (src.startsWith("/") || src.startsWith("~")) return null;
+    const envRef = src.match(/^\$\{?([A-Za-z_][A-Za-z0-9_]*)(?::?-[^}]*)?\}?(.*)$/);
+    if (envRef) {
+      const key = envRef[1];
+      if (!(key in envValues)) {
+        note(`${serviceName}: ścieżka danych z ${key} — wklej plik .env, żeby ją dostosować.`);
+        return null;
+      }
+      const value = envValues[key];
+      if (value.startsWith("/") || value.startsWith("~") || !value) return null;
+      const clean = value.replace(/^\.\//, "").replace(/\/+$/, "");
+      if (clean.includes("..")) return null;
+      const target = `${appData}/${clean}`;
+      envText = setEnvValue(envText, key, target);
+      envValues[key] = target;
+      note(`.env: ${key} = ${target} (dane w app-data, obejmie je kopia zapasowa).`);
+      return null;
+    }
+    if (src.startsWith(".")) {
+      const clean = src.replace(/^\.\//, "").replace(/\/+$/, "");
+      if (!clean || clean === "." || clean.includes("..")) return null;
+      if (looksLikeFile(clean)) {
+        note(`${serviceName}: plik ${src} zostaje obok compose — wgraj go do folderu aplikacji (app/${name}).`);
+        return null;
+      }
+      note(`${serviceName}: dane ${src} → ${appData}/${clean}`);
+      return `${appData}/${clean}`;
+    }
+    // Wolumen nazwany Dockera — chyba że ma własny sterownik albo jest zewnętrzny.
+    const def = YAML.isMap(topVolumes) ? topVolumes.get(src) : null;
+    if (YAML.isMap(def) && (def.has("driver") || def.has("driver_opts") || def.has("external"))) {
+      keptVolumes.add(src);
+      return null;
+    }
+    convertedVolumes.add(src);
+    note(`${serviceName}: dane z ukrytego wolumenu „${src}” → ${appData}/${src} (widać je w plikach, obejmie je kopia zapasowa).`);
+    return `${appData}/${src}`;
+  };
+
+  const used = await collectUsedPorts();
+  const taken = new Set();
+  const [rangeFrom, rangeTo] = String(range || "3000-3099").split("-").map(Number);
+  const isBusy = async (port) => used.has(port) || taken.has(port) || (host ? (await checkTcpPort(host, port, 800)).busy === true : false);
+  const freePort = async () => {
+    for (let p = rangeFrom; p <= rangeTo; p++) if (!(await isBusy(p))) return p;
+    return null;
+  };
+
+  const multi = services.items.length > 1;
+  for (const item of services.items) {
+    const serviceName = String(item.key?.value ?? item.key);
+    const svc = item.value;
+    if (!YAML.isMap(svc)) continue;
+
+    // Wersja obrazu zamiast „latest” (albo braku wersji).
+    const image = svc.get("image");
+    if (image && !String(image).includes("@")) {
+      const ref = String(image);
+      const colon = ref.indexOf(":", ref.lastIndexOf("/") + 1);
+      const tag = colon >= 0 ? ref.slice(colon + 1) : "";
+      // Wersja z .env, np. ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}.
+      const tagVar = tag.match(/^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}$/);
+      if (tagVar) {
+        const key = tagVar[1];
+        const value = key in envValues ? envValues[key] : (tagVar[2] || "");
+        if (!value || value === "latest" || value === "release") {
+          const found = await getStableTags(ref.slice(0, colon));
+          const latest = Array.isArray(found.tags) && found.tags.length ? found.tags[found.tags.length - 1] : null;
+          if (latest && key in envValues) {
+            envText = setEnvValue(envText, key, latest);
+            envValues[key] = latest;
+            note(`.env: ${key} „${value || "brak"}” → ${latest} (stała wersja — działają aktualizacje).`);
+          } else if (latest) {
+            svc.set("image", `${ref.slice(0, colon)}:${latest}`);
+            note(`${serviceName}: wersja „${value || "brak"}” → ${latest} (stała wersja — działają aktualizacje).`);
+          } else {
+            note(`${serviceName}: nie udało się ustalić numeru wersji obrazu — zostaje „${value || "latest"}”.`);
+          }
+        }
+      } else if (!tag || tag === "latest") {
+        const repo = colon >= 0 ? ref.slice(0, colon) : ref;
+        const found = await getStableTags(repo);
+        const latest = Array.isArray(found.tags) && found.tags.length ? found.tags[found.tags.length - 1] : null;
+        if (latest) {
+          svc.set("image", `${repo}:${latest}`);
+          note(`${serviceName}: wersja „${tag || "brak"}” → ${latest} (stała wersja — działają aktualizacje i wiadomo, co jest zainstalowane).`);
+        } else {
+          note(`${serviceName}: nie udało się ustalić numeru wersji obrazu — zostaje „${tag || "latest"}”.`);
+        }
+      }
+    }
+
+    if (!svc.has("container_name")) {
+      const containerName = multi ? `${name}-${serviceName}` : name;
+      svc.set("container_name", containerName);
+      note(`${serviceName}: nazwa kontenera „${containerName}” (czytelna w alertach i Statusie).`);
+    }
+
+    if (!svc.has("restart")) {
+      svc.set("restart", "unless-stopped");
+      note(`${serviceName}: automatyczny start po restarcie serwera (restart: unless-stopped).`);
+    }
+
+    const environment = svc.get("environment");
+    if (YAML.isMap(environment)) {
+      if (!environment.has("TZ")) { environment.set("TZ", INSTALLER_TZ); note(`${serviceName}: strefa czasowa Polski (TZ).`); }
+    } else if (YAML.isSeq(environment)) {
+      if (!environment.items.some((e) => String(e?.value ?? e).startsWith("TZ="))) { environment.add(`TZ=${INSTALLER_TZ}`); note(`${serviceName}: strefa czasowa Polski (TZ).`); }
+    } else if (!environment) {
+      svc.set("environment", doc.createNode({ TZ: INSTALLER_TZ }));
+      note(`${serviceName}: strefa czasowa Polski (TZ).`);
+    }
+
+    const volumes = svc.get("volumes");
+    if (YAML.isSeq(volumes)) {
+      volumes.items.forEach((entry, index) => {
+        if (YAML.isMap(entry)) {
+          const source = entry.get("source");
+          if (!source) return;
+          const target = adaptSource(source, serviceName);
+          if (target) { entry.set("type", "bind"); entry.set("source", target); }
+          return;
+        }
+        const text = String(entry?.value ?? entry);
+        const parts = text.split(":");
+        if (parts.length < 2) return;           // sam folder w kontenerze — bez zmian
+        const target = adaptSource(parts[0], serviceName);
+        if (target) volumes.set(index, [target, ...parts.slice(1)].join(":"));
+      });
+    }
+
+    const ports = svc.get("ports");
+    if (YAML.isSeq(ports)) {
+      for (let index = 0; index < ports.items.length; index++) {
+        const entry = ports.items[index];
+        if (YAML.isMap(entry)) {
+          const published = Number(entry.get("published"));
+          if (!published) continue;
+          if (await isBusy(published)) {
+            const free = await freePort();
+            if (free) { note(`${serviceName}: port ${published} zajmuje ${used.get(published) || "inna usługa"} → ${free}.`); entry.set("published", free); taken.add(free); }
+            else note(`${serviceName}: port ${published} jest zajęty, a w zakresie ${range} nie ma wolnego — zmień go ręcznie.`);
+          } else taken.add(published);
+          continue;
+        }
+        const parsed = parsePortEntry(String(entry?.value ?? entry));
+        if (!parsed) continue;
+        if (await isBusy(parsed.hostPort)) {
+          const free = await freePort();
+          if (free) {
+            note(`${serviceName}: port ${parsed.hostPort} zajmuje ${used.get(parsed.hostPort) || "inna usługa"} → ${free}.`);
+            ports.set(index, formatPortEntry({ ...parsed, hostPort: free }));
+            taken.add(free);
+          } else note(`${serviceName}: port ${parsed.hostPort} jest zajęty, a w zakresie ${range} nie ma wolnego — zmień go ręcznie.`);
+        } else taken.add(parsed.hostPort);
+      }
+    }
+  }
+
+  // Wolumeny nazwane zamienione na foldery — znikają z listy na dole compose.
+  if (YAML.isMap(topVolumes)) {
+    for (const volume of convertedVolumes) if (!keptVolumes.has(volume)) topVolumes.delete(volume);
+    if (!topVolumes.items.length) doc.delete("volumes");
+  }
+
+  return {
+    compose: doc.toString({ lineWidth: 0 }),
+    env: envText,
+    changes,
+    ports: [...taken].sort((a, b) => a - b)
+  };
+}
+
+function installerCheckName(name) {
+  if (!APP_NAME_RE.test(name)) return "Nazwa: małe litery, cyfry, „-” lub „_” (np. immich, paperless-ngx).";
+  if (fs.existsSync(path.join(HOST_APPS_DIR, name))) return `Aplikacja „${name}” już jest na serwerze (folder app/${name}). Wybierz inną nazwę.`;
+  return null;
+}
+
+app.post("/api/apps/installer/adapt", requirePin, async (req, res) => {
+  try {
+    const name = normalizeText(req.body?.name).toLowerCase();
+    const problem = installerCheckName(name);
+    if (problem) return res.status(400).json({ ok: false, message: problem });
+    const range = /^\d{1,5}-\d{1,5}$/.test(String(req.body?.range || "")) ? req.body.range : "3000-3099";
+    const host = normalizeText(req.body?.host);
+    const result = await adaptCompose({ name, compose: req.body?.compose, env: req.body?.env, range, host });
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.post("/api/apps/installer/commit", requirePin, (req, res) => {
+  try {
+    const name = normalizeText(req.body?.name).toLowerCase();
+    const problem = installerCheckName(name);
+    if (problem) return res.status(400).json({ ok: false, message: problem });
+    const compose = String(req.body?.compose || "");
+    const doc = YAML.parseDocument(compose);
+    if (doc.errors.length) return res.status(400).json({ ok: false, message: `Compose ma błąd: ${doc.errors[0].message}` });
+    if (fs.existsSync(APPS_REQUEST_FILE)) return res.status(409).json({ ok: false, message: "Serwer jeszcze zakłada poprzednią aplikację — chwilę poczekaj." });
+    writeJsonFile(APPS_STATE_FILE, { stan: "trwa", nazwa: name, komunikat: "Serwer zakłada foldery i sprawdza compose…", czas: new Date().toISOString() });
+    writeJsonFile(APPS_REQUEST_FILE, { akcja: "zaloz", nazwa: name, compose, env: String(req.body?.env || ""), zlecono: new Date().toISOString() });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
+app.get("/api/apps/installer/status", requirePin, (req, res) => {
+  const state = readJsonFile(APPS_STATE_FILE) || { stan: "brak" };
+  // Karteczka leży długo — zadanie if-aplikacje na serwerze nie działa.
+  const waiting = fs.existsSync(APPS_REQUEST_FILE) ? Date.now() - fs.statSync(APPS_REQUEST_FILE).mtimeMs : 0;
+  res.set("cache-control", "no-store");
+  res.json({ ok: true, ...state, serwerNieOdpowiada: waiting > 30000 });
 });
 
 // ─── Kopia zapasowa (robi ją serwer: zadanie if-backup, uruchamiane przez if-backup.path) ─────

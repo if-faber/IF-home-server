@@ -576,7 +576,9 @@ dialog menu {
 }
 
 /* Progi temperatur (Centrum alertów) */
-.temp-thresholds-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+/* Centrum Alertów: jedna wielkość czcionki dla wyników i opisów (Darek 9.11.2026). */
+:root { --alerts-wyniki: 15px; }
+.temp-thresholds-table { width: 100%; border-collapse: collapse; font-size: var(--alerts-wyniki); }
 .temp-thresholds-table th {
   padding: 8px 10px;
   border-bottom: 1px solid var(--line);
@@ -722,3 +724,23 @@ dialog.if-confirm { width: min(440px, calc(100vw - 28px)); }
 .backup-what-option input { min-height: auto; }
 .backup-what .backup-scope { padding-left: 26px; }
 .backup-what select { min-width: 200px; }
+
+/* Zakładka Aplikacje — podmenu Aktualizacje / Instalator (Darek 9.11.2026). */
+.apps-subnav { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; margin-bottom: 16px; }
+.apps-subnav-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer; }
+.apps-subnav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.apps-subnav-btn.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+/* Zaplecze → Aplikacje → Instalator: dwa okna compose obok siebie (na wąskim ekranie jedno pod drugim). */
+.installer-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
+.installer-row label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.installer-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.installer-col { display: grid; align-content: start; gap: 10px; }
+.installer-col h3 { margin: 0; font-size: 15px; }
+.installer textarea { width: 100%; min-height: 360px; box-sizing: border-box; padding: 10px 12px; font-family: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace; font-size: 13px; line-height: 1.45; white-space: pre; tab-size: 2; resize: vertical; }
+.installer-env textarea { min-height: 120px; margin-top: 8px; }
+.installer-env summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
+.installer-col .button { justify-self: start; }
+.installer-changes { margin-top: 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; font-size: 14px; }
+.installer-changes ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.6; }
+#installerResult { margin-top: 14px; }
+@media (max-width: 900px) { .installer-row, .installer-columns { grid-template-columns: 1fr; } }
