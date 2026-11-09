@@ -168,7 +168,7 @@ function renderAppsUpdates() {
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
           <div>
             <h2>${uiIcon("container", 22)} Aktualizacje aplikacji</h2>
-            <p class="settings-note">Zainstalowana i najnowsza stabilna wersja każdej aplikacji (bez beta/rc/dev). Wersje sprawdzane są raz dziennie — „Sprawdź teraz” pyta od razu. „Aktualizuj compose” zapisuje tylko nowy numer wersji (z kopią pliku, „Cofnij” wraca do poprzedniej); aktualizację uruchamiasz w Dockge i tam widzisz jej przebieg.</p>
+            <p class="settings-note">Zainstalowana i najnowsza stabilna wersja każdej aplikacji (bez beta/rc/dev). Wersje sprawdzane są raz dziennie — „Sprawdź teraz” pyta od razu. <strong>„Aktualizuj”</strong> robi serwer: kopia aplikacji, nowa wersja, uruchomienie i sprawdzenie, czy działa — jeśli nie, powrót do poprzedniej wersji razem z danymi. „Cofnij” przywraca tylko plik compose (dla zaawansowanych, potem Dockge).</p>
             <p class="settings-note" id="containersCheckedAt" style="margin-top: 4px;"></p>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
@@ -177,6 +177,7 @@ function renderAppsUpdates() {
           </div>
         </div>
 
+        <div id="appsUpdateProgress"></div>
         <div id="containersResult" style="margin-top: 10px;">
           <div class="empty" style="font-size: 13px;">Sprawdzanie wersji aplikacji...</div>
         </div>
@@ -194,6 +195,7 @@ function bindAppsEvents() {
   if (document.querySelector("#containersResult")) {
     document.querySelector("#btnRefreshContainers")?.addEventListener("click", () => loadContainers({ force: true }));
     loadContainers();
+    watchAppUpdate({ quiet: true });
   }
 }
 
@@ -264,8 +266,8 @@ async function loadContainers({ force = false } = {}) {
         }
         latestCell = parts.join("") + whatsNew;
         const buttons = [];
-        if (v.latestPatch) buttons.push(`<button type="button" class="button" style="font-size:12px;" data-update-compose data-container="${escapeHtml(v.container)}" data-tag="${escapeHtml(v.latestPatch)}">${uiIcon("save", 14)} Aktualizuj compose → ${escapeHtml(v.latestPatch)}</button>`);
-        if (v.latestMajor) buttons.push(`<button type="button" class="button" style="font-size:12px;" data-update-compose data-major="1" data-container="${escapeHtml(v.container)}" data-tag="${escapeHtml(v.latestMajor)}">${uiIcon("warning", 14)} Zmień na ${escapeHtml(v.latestMajor)}</button>`);
+        if (v.latestPatch) buttons.push(`<button type="button" class="button primary" style="font-size:12px;" data-update-app data-container="${escapeHtml(v.container)}" data-tag="${escapeHtml(v.latestPatch)}">${uiIcon("refresh", 14)} Aktualizuj do ${escapeHtml(v.latestPatch)}</button>`);
+        if (v.latestMajor) buttons.push(`<button type="button" class="button" style="font-size:12px;" data-update-app data-major="1" data-container="${escapeHtml(v.container)}" data-tag="${escapeHtml(v.latestMajor)}">${uiIcon("warning", 14)} Aktualizuj do ${escapeHtml(v.latestMajor)}</button>`);
         if (v.backups) buttons.push(`<button type="button" class="button" style="font-size:12px;" data-compose-restore data-container="${escapeHtml(v.container)}" title="Przywróć compose.yaml z ostatniej kopii (kopii: ${v.backups})">${uiIcon("repeat", 14)} Cofnij</button>`);
         composeCell = buttons.length ? `<div class="upd-buttons">${buttons.join("")}</div>` : `<span style="color:var(--muted);font-size:12px;">—</span>`;
       }
@@ -291,7 +293,7 @@ async function loadContainers({ force = false } = {}) {
               <th style="padding:8px 10px;">Kontener</th>
               <th style="padding:8px 10px;">Zainstalowana wersja</th>
               <th style="padding:8px 10px;">Najnowsza (stabilna)</th>
-              <th style="padding:8px 10px;">Compose</th>
+              <th style="padding:8px 10px;">Aktualizacja</th>
               <th style="padding:8px 10px;">Dockge</th>
             </tr>
           </thead>
@@ -299,8 +301,8 @@ async function loadContainers({ force = false } = {}) {
         </table>
       </div>`;
 
-    result.querySelectorAll("[data-update-compose]").forEach((btnEl) => {
-      btnEl.addEventListener("click", () => updateContainerCompose(btnEl));
+    result.querySelectorAll("[data-update-app]").forEach((btnEl) => {
+      btnEl.addEventListener("click", () => updateApp(btnEl));
     });
     result.querySelectorAll("[data-compose-restore]").forEach((btnEl) => {
       btnEl.addEventListener("click", () => restoreContainerCompose(btnEl));
@@ -327,33 +329,50 @@ async function restoreContainerCompose(btnEl) {
   }
 }
 
-async function updateContainerCompose(btnEl) {
+// ─── Aktualizacja przez serwer (krok 2, Darek 9.11.2026) ──────────────────────
+
+async function updateApp(btnEl) {
   const container = btnEl.dataset.container;
   const tag = btnEl.dataset.tag;
-
   const major = btnEl.dataset.major === "1";
-  const question = major
-    ? `UWAGA — większa zmiana wersji dla „${container}” (na ${tag}).\n\nPrzeczytaj „Co nowego”. Jeśli aplikacja ma dane (np. baza danych), ZRÓB NAJPIERW KOPIĘ DANYCH.\n\nZapisać ${tag} w compose.yaml? Aktualizację uruchomisz potem w Dockge.`
-    : `Zapisać wersję „${tag}” w compose.yaml dla „${container}”?\n\nTo tylko zapisuje plik (z kopią) — aktualizację uruchamiasz w Dockge.`;
-  if (!(await ifConfirm(question, { title: major ? "Większa zmiana wersji" : "Potwierdź", okLabel: "Zapisz wersję", danger: major }))) {
+  let configured = false;
+  try { configured = (await request("/api/tools/backup/status")).configured; } catch {}
+  const steps = configured
+    ? "Najpierw zrobię kopię tej aplikacji, potem pobiorę i uruchomię nową wersję i sprawdzę, czy działa. Jeśli nie zadziała — wrócę do poprzedniej wersji razem z danymi z tej kopii."
+    : "UWAGA: kopia zapasowa nie jest ustawiona (Zaplecze → Kopia zapasowa) — aktualizacja bez kopii. Jeśli nowa wersja nie zadziała, wrócę do poprzedniej wersji, ale zmian w danych nie da się cofnąć.";
+  const warn = major ? "\n\nTo większa zmiana wersji — przeczytaj najpierw „Co nowego”." : "";
+  const question = `Zaktualizować „${container}” do ${tag}?\n\n${steps}${warn}\n\nAplikacja będzie na chwilę niedostępna.`;
+  if (!(await ifConfirm(question, { title: major ? "Większa zmiana wersji" : "Aktualizacja aplikacji", okLabel: "Aktualizuj", danger: major || !configured }))) return;
+  try {
+    await request("/api/apps/update", { method: "POST", body: JSON.stringify({ container, tag }) });
+    document.querySelectorAll("[data-update-app]").forEach((b) => { b.disabled = true; });
+    watchAppUpdate();
+  } catch (error) {
+    await ifAlert(error.message, { title: "Nie można zaktualizować" });
+  }
+}
+
+// Postęp aktualizacji (zadanie if-aplikacje) — pasek nad tabelą, na końcu okienko z wynikiem.
+let appUpdateTimer = null;
+async function watchAppUpdate({ quiet = false } = {}) {
+  clearTimeout(appUpdateTimer);
+  const box = document.querySelector("#appsUpdateProgress");
+  if (!box) return;
+  let s;
+  try { s = await request("/api/apps/installer/status"); } catch { return; }
+  if (s.rodzaj !== "aktualizacja") return;
+  if (s.stan === "trwa") {
+    box.innerHTML = `
+      <div class="sys-upd-box apps-update-progress">
+        <strong>Aktualizacja: ${escapeHtml(s.nazwa || "")} — ${Number(s.procent) || 0}%</strong>
+        <span>${escapeHtml(s.serwerNieOdpowiada ? "Serwer nie odpowiada — zadanie „if-aplikacje” chyba nie jest zainstalowane (sudo if-server → Upgrade)." : (s.etap || ""))}</span>
+        <span class="backup-progress"><span style="width:${Number(s.procent) || 0}%"></span></span>
+      </div>`;
+    appUpdateTimer = setTimeout(() => watchAppUpdate(), 2000);
     return;
   }
-
-  const originalLabel = btnEl.textContent;
-  btnEl.disabled = true;
-  btnEl.textContent = "Zapisywanie...";
-
-  try {
-    const res = await request("/api/docker/update-compose", {
-      method: "POST",
-      body: JSON.stringify({ container, tag })
-    });
-    loadContainers();
-    await ifAlert(res.message || "Zapisano nowy tag w compose.yaml.", { title: "Gotowe" });
-  } catch (error) {
-    await ifAlert(error.message, { title: "Błąd" });
-  } finally {
-    btnEl.disabled = false;
-    btnEl.textContent = originalLabel;
-  }
+  box.innerHTML = "";
+  if (quiet) return;
+  loadContainers();
+  await ifAlert(s.komunikat || "", { title: s.stan === "gotowe" ? "Zaktualizowano" : "Aktualizacja nie powiodła się" });
 }

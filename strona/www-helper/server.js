@@ -3142,6 +3142,34 @@ app.post("/api/apps/installer/commit", requirePin, (req, res) => {
   }
 });
 
+// Aktualizacja aplikacji przez serwer (krok 2, Darek 9.11.2026): kopia aplikacji → nowa wersja →
+// pobranie i uruchomienie → sprawdzenie → przy błędzie powrót z danymi. Robi to zadanie if-aplikacje.
+app.post("/api/apps/update", requirePin, async (req, res) => {
+  try {
+    const container = normalizeText(req.body?.container);
+    const tag = normalizeText(req.body?.tag);
+    if (DOCKER_VERSION_EXCLUDE.has(container)) return res.status(400).json({ ok: false, message: "Ten kontener jest wykluczony z aktualizacji przez ten panel." });
+    if (!tag || !isStableTag(tag)) return res.status(400).json({ ok: false, message: "Niepoprawny numer wersji." });
+    const { stack, service } = await containerStackAndService(container);
+    if (!APP_NAME_RE.test(stack) || !isSafeName(service)) return res.status(400).json({ ok: false, message: "Niepoprawna nazwa kontenera lub stosu." });
+    const composePath = findComposeFile(stack);
+    if (!composePath) return res.status(404).json({ ok: false, message: `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}.` });
+    if ((readJsonFile(APPS_STATE_FILE) || {}).stan === "trwa" || fs.existsSync(APPS_REQUEST_FILE)) {
+      return res.status(409).json({ ok: false, message: "Trwa inna praca z aplikacjami — poczekaj na jej koniec." });
+    }
+    if ((readJsonFile(BACKUP_STATE_FILE) || {}).stan === "trwa") return res.status(409).json({ ok: false, message: "Trwa kopia zapasowa albo przywracanie — poczekaj na jej koniec." });
+    const { text, updated } = setServiceImageTag(fs.readFileSync(composePath, "utf8"), service, tag);
+    if (!updated) return res.status(404).json({ ok: false, message: `Nie znaleziono linii "image:" dla serwisu "${service}" w ${stack}/${path.basename(composePath)}.` });
+    // Kopia przed aktualizacją — gdy kopia zapasowa jest ustawiona (i użytkownik jej nie wyłączył).
+    const kopia = Boolean((readJsonFile(BACKUP_SETTINGS_FILE) || {}).dysk) && req.body?.kopia !== false;
+    writeJsonFile(APPS_STATE_FILE, { stan: "trwa", rodzaj: "aktualizacja", nazwa: stack, procent: 0, etap: "Czekam na serwer…", czas: new Date().toISOString() });
+    writeJsonFile(APPS_REQUEST_FILE, { akcja: "aktualizuj", stos: stack, kontener: container, tag, compose: text, kopia, zlecono: new Date().toISOString() });
+    res.json({ ok: true, stack, kopia });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
 app.get("/api/apps/installer/status", requirePin, (req, res) => {
   const state = readJsonFile(APPS_STATE_FILE) || { stan: "brak" };
   // Karteczka leży długo — zadanie if-aplikacje na serwerze nie działa.

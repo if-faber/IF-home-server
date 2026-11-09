@@ -99,7 +99,8 @@ const UI_ICON_PATHS = {
   button: `<circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="1" />`,
   repeat: `<path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" />`,
   chart: `<path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" />`,
-  info: `<circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" />`
+  info: `<circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" />`,
+  help: `<circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" />`
 };
 
 // Ikony spoza listy wyżej — z pełnego zestawu Lucide (www/lucide-sprite.svg, ISC, lokalnie, bez internetu).

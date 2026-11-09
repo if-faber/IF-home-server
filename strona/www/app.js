@@ -176,6 +176,7 @@ function appShell() {
           </div>
           <div class="sidebar-tools">
             <button type="button" class="sidebar-icon-btn" id="sidebarIconMode" title="Tryb dzień / noc" aria-label="Przełącz tryb dzień / noc">${modeToggleIcon()}</button>
+            <button type="button" class="sidebar-icon-btn" id="sidebarHelpButton" title="Informator — gdzie co jest" aria-label="Informator">${uiIcon("help", 20)}</button>
             <button type="button" class="sidebar-icon-btn" id="sidebarMenuButton" title="Ustawienia" aria-label="Ustawienia" aria-haspopup="menu" aria-expanded="false">${uiIcon("settings", 20)}</button>
           </div>
           <div class="sidebar-footer">created by <strong>Idea Forge</strong></div>
@@ -449,6 +450,7 @@ function bindShell() {
     // Zamknięcie bez zapisu = powrót do tego, co jest w plikach custom-d/n.css.
     discardThemePreview();
   });
+  document.querySelector("#sidebarHelpButton")?.addEventListener("click", openInformator);
   document.querySelector("#sidebarIconMode")?.addEventListener("click", () => {
     setMode(currentMode() === "n" ? "d" : "n");
   });
@@ -1768,3 +1770,52 @@ async function init() {
 }
 
 init();
+
+// ─── Informator: skrócona obsługa — najważniejsze rzeczy, gdzie co jest (Darek 9.11.2026) ───
+function openInformator() {
+  const host = escapeHtml(dashboardConfig.defaultHost || window.location.hostname);
+  const admin = (tab, text) => `<a href="./mods/admin/?tab=${tab}">${text}</a>`;
+  const dialog = document.createElement("dialog");
+  dialog.className = "if-confirm informator";
+  dialog.innerHTML = `
+    <div class="modal-panel">
+      <header class="modal-heading"><div><h2>${uiIcon("help", 22)} Informator</h2></div>
+        <button type="button" data-close aria-label="Zamknij">×</button></header>
+      <div class="informator-body">
+        <h3>Strona główna</h3>
+        <ul>
+          <li><strong>Menu ⚙️</strong> (w pasku bocznym i na dole strony) — dodaj link, dodaj sekcję, wygląd, Zablokuj / Odblokuj edycję.</li>
+          <li><strong>Strony w menu</strong> (Home, Ulubione…) — na nich sekcje z kafelkami linków.</li>
+          <li><a href="#" data-informator-status><strong>Status serwera</strong></a> — statystyki, aktualizacje (Debian, IF-home-server, aplikacje) i procesy (Top).</li>
+          <li><strong>Dzwonek</strong> w nagłówku — alerty. Pasek na górze strony — awarie, przekroczone temperatury, postęp kopii.</li>
+          <li><strong>☀️/🌙</strong> — tryb dzień / noc.</li>
+        </ul>
+        <h3>Zaplecze (PIN)</h3>
+        <ul>
+          <li>${admin("apps", "<strong>Aplikacje</strong>")} — <em>Aktualizacje</em> (przycisk „Aktualizuj”: kopia, nowa wersja, sprawdzenie) i <em>Instalator</em> (nowa aplikacja z compose).</li>
+          <li>${admin("backup", "<strong>Kopia zapasowa</strong>")} — dysk na kopie, jak często, ile kopii, kopia teraz, przywracanie.</li>
+          <li>${admin("alerts", "<strong>Centrum Alertów</strong>")} — kontenery, logi, progi temperatur i obciążenia.</li>
+          <li>${admin("homepage", "<strong>Strony i sekcje</strong>")} — nazwy, kolejność, usuwanie stron, sekcji i linków.</li>
+          <li>${admin("modules", "<strong>Moduły</strong>")} — Kiosk, Tester portów.</li>
+          <li>${admin("helper", "<strong>Ustawienia ogólne</strong>")} — tytuł strony, adres strony startowej (nazwa serwera), PIN, logo.</li>
+        </ul>
+        <h3>Poza stroną</h3>
+        <ul>
+          <li><a href="http://${host}:5001" target="_blank" rel="noopener"><strong>Dockge</strong></a> (port 5001) — stosy aplikacji (compose), uruchamianie, logi.</li>
+          <li><a href="https://${host}:9090" target="_blank" rel="noopener"><strong>Cockpit</strong></a> (port 9090) — system: aktualizacje Debiana, dyski, udostępnianie plików.</li>
+          <li><strong>Terminal serwera:</strong> <code>sudo if-server</code> — aktualizacja programu serwera, Upgrade (naprawa i nowe składniki), Stan serwera.</li>
+        </ul>
+      </div>
+    </div>`;
+  dialog.querySelector("[data-close]").addEventListener("click", () => dialog.close());
+  dialog.querySelector("[data-informator-status]").addEventListener("click", (event) => {
+    event.preventDefault();
+    dialog.close();
+    state.view = "status";
+    render();
+  });
+  dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  document.body.appendChild(dialog);
+  dialog.showModal();
+}

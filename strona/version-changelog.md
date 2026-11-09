@@ -5,6 +5,14 @@ druga cyfra wersji jest wspólna z serwerem, trzecia — poprawki samej strony.
 
 ---
 
+## v0.4.1 — 2026-11-09
+
+- **Aktualizacja aplikacji jednym przyciskiem** (Zaplecze → Aplikacje → Aktualizacje, „Aktualizuj do …”). Robi to serwer: pobiera nową wersję (aplikacja działa dalej), robi kopię aplikacji (gdy kopia zapasowa jest ustawiona), uruchamia nową wersję i sprawdza, czy działa. Jeśli nie — wraca do poprzedniej wersji razem z danymi z kopii. Postęp nad tabelą, na końcu okienko z wynikiem. Bez Dockge.
+- **Informator** — ikonka **?** w pasku bocznym: skrócona obsługa, gdzie co jest, z odnośnikami prosto do miejsc.
+- Wymaga zaktualizowanego zadania serwera `if-aplikacje`: `sudo if-server` → aktualizuj → Upgrade.
+
+---
+
 ## v0.4.0 — 2026-11-09
 
 Wersja stabilna: **kopia zapasowa i przywracanie** (od v0.3.5) oraz **Instalator aplikacji** (od v0.3.6), sprawdzone na serwerze.

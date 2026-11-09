@@ -744,3 +744,5 @@ dialog.if-confirm { width: min(440px, calc(100vw - 28px)); }
 .installer-changes ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.6; }
 #installerResult { margin-top: 14px; }
 @media (max-width: 900px) { .installer-row, .installer-columns { grid-template-columns: 1fr; } }
+/* Aplikacje → Aktualizacje: postęp aktualizacji przez serwer. */
+.apps-update-progress { display: grid; gap: 6px; margin-bottom: 12px; }

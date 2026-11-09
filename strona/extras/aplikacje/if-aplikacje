@@ -15,6 +15,13 @@
 #   3. foldery danych z compose, które leżą w ~/docker/app-data/<nazwa> — też użytkownika.
 # Aplikacji nie uruchamia (to robi użytkownik w Dockge). Niczego nie nadpisuje.
 #
+# Akcja „aktualizuj” (Zaplecze → Aplikacje → Aktualizacje, przycisk „Aktualizuj”):
+#   1. pobranie nowej wersji (aplikacja działa dalej; gdy się nie da — koniec, nic nie zmienione),
+#   2. kopia tej aplikacji — przez zadanie kopii zapasowej (karteczka backup-zlecenie.json),
+#   3. nowy compose (strona podaje go z nową wersją), stary odłożony do app/<stos>/backup/; up -d,
+#   4. sprawdzenie, czy kontenery działają (i są „healthy”, jeśli mają healthcheck),
+#   5. gdy nie działają: stary compose z powrotem, up -d i dane z kopii z punktu 1.
+#
 # Użycie (jako root, z if-aplikacje.service):
 #   if-aplikacje obsluz /home/{user}/docker/app-data/if-startpage/config [kolejny folder config ...]
 #   {user} — twoja nazwa użytkownika
@@ -27,6 +34,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime
 
 NAZWA_APLIKACJI = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
@@ -149,6 +157,176 @@ def zaloz(config, zlecenie):
             shutil.rmtree(tymczasowy, ignore_errors=True)
 
 
+# ─── Aktualizacja aplikacji ──────────────────────────────────────────────────
+
+CZAS_KOPII_S = 3 * 3600          # kopia dużej aplikacji może trwać długo
+CZAS_STARTU_S = 180              # tyle czekamy, aż nowa wersja wstanie
+SPOKOJ_S = 20                    # kontener bez healthchecka: musi działać tyle sekund bez restartu
+
+
+def stan_aktualizacji(config, **pola):
+    plik = os.path.join(config, "aplikacje-stan.json")
+    stan = czytaj_json(plik) or {}
+    stan.update(pola)
+    zapisz_json(plik, stan)
+
+
+def zlecenie_kopii(config, zlecenie, opis):
+    """Zleca pracę zadaniu kopii zapasowej (jak strona) i czeka na wynik; zwraca stan kopii."""
+    plik = os.path.join(config, "backup-zlecenie.json")
+    stan_plik = os.path.join(config, "backup-stan.json")
+    if (czytaj_json(stan_plik) or {}).get("stan") == "trwa" or os.path.exists(plik):
+        raise Blad("Trwa kopia zapasowa albo przywracanie — spróbuj po jej zakończeniu.")
+    start = time.time()
+    zapisz_json(plik, {**zlecenie, "zlecono": teraz()})
+    while time.time() - start < CZAS_KOPII_S:
+        time.sleep(3)
+        stan = czytaj_json(stan_plik) or {}
+        if os.path.exists(plik):
+            if time.time() - start > 60:
+                os.remove(plik)
+                raise Blad("Zadanie kopii zapasowej nie odpowiada (if-backup). W terminalu serwera: sudo if-server → Upgrade.")
+            continue
+        if stan.get("stan") in ("gotowa", "blad") and stan.get("koniec") and \
+                datetime.fromisoformat(stan["koniec"]).timestamp() >= start - 1:
+            if stan["stan"] == "blad":
+                raise Blad(f"{opis} nie udała się: {stan.get('komunikat') or 'nieznany błąd'}")
+            return stan
+    raise Blad(f"{opis} trwa zbyt długo — przerwałem czekanie.")
+
+
+def compose_ps(folder, plik):
+    wynik = subprocess.run(["docker", "compose", "-f", plik, "ps", "--all", "--format", "json"],
+                           cwd=folder, capture_output=True, text=True, timeout=60)
+    tekst = wynik.stdout.strip()
+    if not tekst:
+        return []
+    try:
+        dane = json.loads(tekst)
+        return dane if isinstance(dane, list) else [dane]
+    except ValueError:
+        return [json.loads(linia) for linia in tekst.splitlines() if linia.strip()]
+
+
+def czy_dziala(folder, plik):
+    """Czeka, aż wszystkie kontenery stosu działają; zwraca (True, "") albo (False, opis)."""
+    start = time.time()
+    spokojnie_od = None
+    restart_od = None
+    while time.time() - start < CZAS_STARTU_S:
+        time.sleep(3)
+        kontenery = compose_ps(folder, plik)
+        if not kontenery:
+            continue
+        # Ciągłe restarty przez 30 s — aplikacja się wywraca, nie czekamy do końca.
+        if any(k.get("State") == "restarting" for k in kontenery):
+            restart_od = restart_od or time.time()
+        else:
+            restart_od = None
+        zle = [k for k in kontenery if k.get("State") in ("exited", "dead") or k.get("Health") == "unhealthy"
+               or (restart_od and time.time() - restart_od >= 30 and k.get("State") == "restarting")]
+        if zle:
+            k = zle[0]
+            return False, f"{k.get('Name')}: {k.get('Status') or k.get('State')}"
+        gotowe = all(k.get("State") == "running" and k.get("Health") in ("", None, "healthy") for k in kontenery)
+        if gotowe:
+            spokojnie_od = spokojnie_od or time.time()
+            if time.time() - spokojnie_od >= SPOKOJ_S:
+                return True, ""
+        else:
+            spokojnie_od = None
+    kontenery = compose_ps(folder, plik)
+    opis = ", ".join(f"{k.get('Name')}: {k.get('Status') or k.get('State')}" for k in kontenery) or "brak kontenerów"
+    return False, f"aplikacja nie wstała w ciągu {CZAS_STARTU_S // 60} min ({opis})"
+
+
+def compose_up(folder, plik, *dodatkowe):
+    wynik = subprocess.run(["docker", "compose", "-f", plik, *dodatkowe],
+                           cwd=folder, capture_output=True, text=True, timeout=1800)
+    if wynik.returncode != 0:
+        opis = (wynik.stderr or wynik.stdout).strip().splitlines()
+        raise Blad(opis[-1] if opis else "nieznany błąd Dockera")
+
+
+def aktualizuj(config, zlecenie):
+    stos = str(zlecenie.get("stos") or "")
+    if not NAZWA_APLIKACJI.match(stos):
+        raise Blad("Niepoprawna nazwa aplikacji.")
+    dom, uid, gid = wlasciciel(config)
+    folder = os.path.join(dom, "docker", "app", stos)
+    plik = next((os.path.join(folder, n) for n in ("compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml")
+                 if os.path.isfile(os.path.join(folder, n))), None)
+    if not plik:
+        raise Blad(f"Nie znaleziono pliku compose aplikacji „{stos}”.")
+    nowy = str(zlecenie.get("compose") or "")
+    wersja = str(zlecenie.get("tag") or "")
+    if "services" not in nowy:
+        raise Blad("Strona nie podała nowego compose.")
+
+    # 1. Pobranie nowej wersji z compose obok (aplikacja działa dalej). Nie da się — nic nie zmieniamy.
+    stan_aktualizacji(config, etap=f"Pobieranie wersji {wersja}", procent=10)
+    nowy_plik = os.path.join(folder, ".if-compose-nowy.yaml")
+    with open(nowy_plik, "w", encoding="utf-8") as f:
+        f.write(nowy)
+    try:
+        compose_up(folder, nowy_plik, "pull")
+    except Blad as e:
+        raise Blad(f"Nie udało się pobrać nowej wersji ({e}). Nic nie zmieniłem — aplikacja działa jak dotąd.")
+    finally:
+        os.remove(nowy_plik)
+
+    # 2. Kopia tej aplikacji (jeśli kopia zapasowa jest ustawiona i użytkownik jej nie wyłączył).
+    kopia = None
+    if zlecenie.get("kopia"):
+        stan_aktualizacji(config, etap="Kopia zapasowa aplikacji", procent=30)
+        kopia = zlecenie_kopii(config, {"akcja": "kopia", "aplikacja": stos}, "Kopia aplikacji przed aktualizacją")
+        kopia = (kopia.get("ostatnia") or {}).get("folder")
+
+    # 2. Nowy compose; stary odłożony jak przy „Aktualizuj compose” (działa też „Cofnij”).
+    stan_aktualizacji(config, etap="Zapis nowej wersji", procent=40)
+    with open(plik, encoding="utf-8") as f:
+        stary = f.read()
+    kopie_compose = os.path.join(folder, "backup")
+    os.makedirs(kopie_compose, exist_ok=True)
+    oddaj(kopie_compose, uid, gid)
+    odlozony = os.path.join(kopie_compose, "compose.yaml." + datetime.now().strftime("%Y%m%d-%H%M%S"))
+    with open(odlozony, "w", encoding="utf-8") as f:
+        f.write(stary)
+    oddaj(odlozony, uid, gid)
+    with open(plik, "w", encoding="utf-8") as f:
+        f.write(nowy)
+
+    def przywroc_stary(powod):
+        stan_aktualizacji(config, etap="Powrót do poprzedniej wersji", procent=85)
+        with open(plik, "w", encoding="utf-8") as f:
+            f.write(stary)
+        dane = ""
+        if kopia:
+            stan_aktualizacji(config, etap="Przywracanie danych z kopii", procent=90)
+            zlecenie_kopii(config, {"akcja": "przywroc", "kopia": kopia, "aplikacja": stos}, "Przywracanie danych")
+            dane = f" i dane z kopii {kopia}"
+        # Kontenery od nowa z poprzedniego compose (samo uruchomienie zostawiłoby nową wersję).
+        compose_up(folder, plik, "up", "-d", "--force-recreate")
+        dziala, opis = czy_dziala(folder, plik)
+        if not dziala:
+            raise Blad(f"Nowa wersja nie działa ({powod}), a po powrocie do poprzedniej wersji{dane} aplikacja też nie wstała ({opis}). Sprawdź ją w Dockge.")
+        raise Blad(f"Nowa wersja nie działa ({powod}). Przywróciłem poprzednią wersję{dane} — aplikacja działa jak przed aktualizacją.")
+
+    # 3. Uruchomienie nowej wersji.
+    stan_aktualizacji(config, etap="Uruchamianie nowej wersji", procent=70)
+    try:
+        compose_up(folder, plik, "up", "-d")
+    except Blad as e:
+        przywroc_stary(str(e))
+
+    # 4. Czy działa?
+    stan_aktualizacji(config, etap="Sprawdzanie, czy aplikacja działa", procent=80)
+    dziala, opis = czy_dziala(folder, plik)
+    if not dziala:
+        przywroc_stary(opis)
+    return kopia
+
+
 def obsluz(config):
     """Uruchamiane przez if-aplikacje.path, gdy strona zostawi karteczkę."""
     zlecenie_plik = os.path.join(config, "aplikacje-zlecenie.json")
@@ -171,6 +349,22 @@ def obsluz(config):
         except Exception as e:  # nieoczekiwany błąd — opis na stronę, szczegóły w dzienniku
             print(f"if-aplikacje: {e!r}", file=sys.stderr)
             zapisz_json(stan_plik, {"stan": "blad", "nazwa": nazwa, "czas": teraz(),
+                                    "komunikat": f"Nieoczekiwany błąd: {e}. Szczegóły: journalctl -u if-aplikacje"})
+    elif akcja == "aktualizuj":
+        stos = zlecenie.get("stos")
+        stan_aktualizacji(config, stan="trwa", rodzaj="aktualizacja", nazwa=stos, procent=5,
+                          etap="Przygotowanie", komunikat="", czas=teraz())
+        try:
+            kopia = aktualizuj(config, zlecenie)
+            zapisz_json(stan_plik, {
+                "stan": "gotowe", "rodzaj": "aktualizacja", "nazwa": stos, "procent": 100, "etap": "Gotowe", "czas": teraz(),
+                "komunikat": f"Aplikacja „{stos}” działa w wersji {zlecenie.get('tag')}."
+                             + (f" Kopia sprzed aktualizacji: {kopia}." if kopia else "")})
+        except Blad as e:
+            zapisz_json(stan_plik, {"stan": "blad", "rodzaj": "aktualizacja", "nazwa": stos, "komunikat": str(e), "czas": teraz()})
+        except Exception as e:  # nieoczekiwany błąd — opis na stronę, szczegóły w dzienniku
+            print(f"if-aplikacje: {e!r}", file=sys.stderr)
+            zapisz_json(stan_plik, {"stan": "blad", "rodzaj": "aktualizacja", "nazwa": stos, "czas": teraz(),
                                     "komunikat": f"Nieoczekiwany błąd: {e}. Szczegóły: journalctl -u if-aplikacje"})
     elif akcja:
         print(f"if-aplikacje: nieznana akcja „{akcja}”", file=sys.stderr)

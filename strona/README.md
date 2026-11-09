@@ -24,14 +24,15 @@ strony (0.3.1, 0.3.2…).
   Zaplecze, blokada edycji), menu ⚙️ na dole strony (dodaj link, dodaj sekcję, Zarządzanie),
   chowany pasek boczny, kafelki CPU i RAM w nagłówku (kolor wg progów) i dzwonek alertów.
   Awarie i przekroczone progi temperatur pokazuje pasek na górze strony (zamykany ✕).
+  Ikonka **?** w pasku bocznym — **Informator**: skrócona obsługa, gdzie co jest.
 - **Zaplecze** (chronione PIN-em, tryb dzień/noc wspólny ze Stroną Główną):
   - Ustawienia ogólne,
   - Centrum Alertów — stan kontenerów, temperatury, RAM, dyski, logi kontenerów;
     progi temperatur dla każdego czujnika i progi obciążenia CPU/RAM,
   - Statystyki Live — CPU, temperatury wszystkich czujników, RAM, dyski, sieć, procesy,
   - Strony i sekcje — dodawanie, nazwy, kolejność i usuwanie stron, sekcji i linków,
-  - Aplikacje → Aktualizacje — porównuje wersje obrazów z najnowszymi stabilnymi
-    i podmienia tag wersji w `compose.yaml` wybranego stosu,
+  - Aplikacje → Aktualizacje — wersje aplikacji i „Aktualizuj” (robi serwer: kopia, nowa wersja,
+    sprawdzenie, przy błędzie powrót z danymi),
   - Aplikacje → Instalator — dostosowuje compose aplikacji do serwera i zakłada ją,
   - Kopia zapasowa i przywracanie,
   - Moduły (Kiosk, Tester portów), edytor wyglądu Zaplecza (osobno dzień i noc).
@@ -74,8 +75,8 @@ ghcr.io/if-faber/if-startpage:vX.Y.Z
 Program pyta o PIN, zakłada stos `if-startpage` w Dockge z właściwymi ścieżkami i uruchamia
 stronę pod adresem `http://adres-serwera/`. Instrukcja całości: README projektu IF-home-server.
 
-**Aktualizacja strony:** Zaplecze → Aplikacje → Aktualizacje → przy `if-startpage` „Aktualizuj compose”,
-potem „Aktualizuj” w Dockge. Przy aktualizacji serwera (`sudo if-server` → aktualizuj → Upgrade)
+**Aktualizacja strony:** Zaplecze → Aplikacje → Aktualizacje → przy `if-startpage` „Aktualizuj do …”
+(strona na chwilę zniknie i wróci w nowej wersji). Przy aktualizacji serwera (`sudo if-server` → aktualizuj → Upgrade)
 strona starsza niż wersja wydana razem z serwerem jest aktualizowana sama; nowszej nie rusza.
 
 Strona postawiona wcześniej ręcznie z niepodmienionym `{user}` w ścieżkach jest przy Upgrade
@@ -85,7 +86,8 @@ przenoszona na właściwe miejsce — po pytaniu na ekranie; stare dane zostają
 
 - `DOCKER_VERSION_EXCLUDE` — kontenery pomijane przy sprawdzaniu wersji, po przecinku
   (np. obrazy budowane lokalnie).
-- `DOCKER_STACK_OVERRIDES` — gdy nazwa kontenera różni się od nazwy stosu lub serwisu,
+- `DOCKER_STACK_OVERRIDES` — zwykle niepotrzebne (stos i serwis strona bierze z etykiet Docker
+  Compose); tylko gdy kontener nie ma tych etykiet, a jego nazwa różni się od nazwy stosu lub serwisu,
   w formacie JSON, np. `{"wordpress_db":{"stack":"wordpress","service":"db"}}`.
 
 ## Wygląd strony: dzień i noc
@@ -188,16 +190,15 @@ Tabela pokazuje dla każdej aplikacji (kontenera) zainstalowaną i najnowszą we
 - **„Obraz lokalny (tester)”** — obraz zbudowany na Twoim serwerze; nie ma czego sprawdzać.
 - Gdy są nowe wersje, w dzwonku pojawia się informacja **„Dostępne aktualizacje: N”**.
 
-Jak zaktualizować aplikację — dwa kroki, żeby widzieć, co się dzieje:
+Jak zaktualizować aplikację — przycisk **„Aktualizuj do …”**. Resztę robi serwer (zadanie `if-aplikacje`):
 
-1. **„Aktualizuj compose”** — zapisuje w `compose.yaml` aplikacji tylko nowy numer wersji.
-   Przed zmianą zapisuje kopię w folderze `backup` aplikacji
-   (`~/docker/app/<aplikacja>/backup/`, ostatnie 5 kopii).
-2. **„Restart / Aktualizuj”** — otwiera aplikację w Dockge. Kliknij tam **„Aktualizuj”**
-   i patrz, jak pobiera się nowa wersja i aplikacja startuje.
+1. pobiera nową wersję (aplikacja działa dalej; gdy się nie da — nic nie zmienia),
+2. robi kopię tej aplikacji (gdy kopia zapasowa jest ustawiona),
+3. zapisuje nową wersję w compose (poprzedni plik — w `~/docker/app/<aplikacja>/backup/`) i uruchamia ją,
+4. sprawdza, czy aplikacja działa — jeśli nie, wraca do poprzedniej wersji razem z danymi z kopii.
 
-Coś poszło nie tak? **„Cofnij”** przywraca `compose.yaml` z ostatniej kopii — potem znowu
-„Aktualizuj” w Dockge.
+Postęp widać nad tabelą, na końcu okienko z wynikiem. **„Cofnij”** przywraca sam plik compose
+z ostatniej kopii (dla zaawansowanych — potem „Aktualizuj” w Dockge).
 
 **WordPress:** sam WordPress, wtyczki i motywy aktualizujesz w panelu WordPressa
 (Kokpit → Aktualizacje). Nowy obraz `wordpress` zmienia tylko PHP i serwer Apache.
@@ -254,8 +255,8 @@ W Zaplecze → Centrum alertów:
 
 ## Znane ograniczenia
 
-- **Aktualizacje pakietów systemowych (apt)** nie są sprawdzane z wnętrza kontenera —
-  kontener nie widzi pakietów serwera. Zakładka odsyła do Cockpit (port 9090).
+- **Aktualizacje pakietów systemowych (apt)** — kontener nie widzi pakietów serwera: listę zapisuje
+  serwer (zadanie `if-system-updates`), a instalujesz je w Cockpit (port 9090).
 - **Dyski** w Diagnostyce pokazują to, co widzi kontener — zwykle dysk systemowy.
 - **Procesy** w Top / Statystykach Live to procesy kontenera, nie całego serwera
   (kontener ma własną przestrzeń procesów).

@@ -11,7 +11,7 @@
 NAZWA="IF-startpage (strona startowa)"
 WERSJA=8
 
-IFSTARTPAGE_TAG="v0.4.0"
+IFSTARTPAGE_TAG="v0.4.1"
 
 ifstartpage_compose() {
     printf '%s\n' "${USER_HOME}/docker/app/if-startpage/compose.yaml"
