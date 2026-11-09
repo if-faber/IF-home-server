@@ -12,7 +12,7 @@ const state = {
 
 window.state = state;
 
-const TAB_IDS = ["helper", "alerts", "live", "homepage", "modules", "kiosk", "updates", "admin-theme"];
+const TAB_IDS = ["helper", "alerts", "live", "homepage", "modules", "kiosk", "updates", "backup", "admin-theme"];
 
 // Zakładki-moduły dostępne wyłącznie przez hub "Moduły" (tab-modules.js) —
 // nie mają własnego przycisku w sidebarze, więc podświetlają przycisk "tab-modules".
@@ -71,6 +71,10 @@ function switchTab(tabId) {
     setTabTitle("package", "Aktualizacje Systemu & Docker");
     content.innerHTML = renderUpdatesTab();
     bindUpdatesEvents();
+  } else if (tabId === "backup") {
+    setTabTitle("save", "Kopia zapasowa");
+    content.innerHTML = renderBackupTab();
+    bindBackupEvents();
   } else if (tabId === "admin-theme") {
     setTabTitle("appearance", "Wygląd Zaplecza");
     content.innerHTML = renderAdminThemeTab();

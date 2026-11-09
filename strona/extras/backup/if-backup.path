@@ -1,0 +1,10 @@
+[Unit]
+Description=IF-home-server: kopia zapasowa — czekanie na zlecenie ze strony startowej
+
+[Path]
+# Strona zostawia „karteczkę” backup-zlecenie.json; if-backup ją podejmuje i usuwa.
+PathExists=/home/{user}/docker/app-data/if-startpage/config/backup-zlecenie.json
+Unit=if-backup.service
+
+[Install]
+WantedBy=multi-user.target

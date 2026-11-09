@@ -5,6 +5,20 @@ druga cyfra wersji jest wspólna z serwerem, trzecia — poprawki samej strony.
 
 ---
 
+## v0.3.5 — 2026-11-09
+
+**Kopia zapasowa i przywracanie** (Zaplecze → Kopia zapasowa) — wersja do testów; po testach i ostatnich poprawkach: v0.4.0.
+
+- **Konfiguracja:** wybór dysku dla kopii (zalecany dysk zewnętrzny USB; dysk systemu i dyski wewnętrzne z ostrzeżeniem, dysków w formacie Windows i pustych nie da się wybrać — nic nie jest formatowane), jak często (codziennie / co tydzień / tylko ręcznie) i ile kopii trzymać — osobno dla kopii „Wszystko” i dla kopii każdej aplikacji.
+- **Wykonaj kopię zapasową:** „Wszystko” (aplikacje i ich dane, Twoje pliki, ustawienia serwera — z szacowaną wielkością) albo wybrana aplikacja. Kolejne kopie zajmują tylko to, co się zmieniło. Aplikacje zatrzymywane na czas kopii, po jednej.
+- **Przywracanie:** wszystkie aplikacje albo wybrana, ze stanu z wybranej kopii. Obecne dane nie są kasowane — trafiają do `~/backups/przed-przywroceniem`.
+- Postęp w panelu i w pasku na górze strony; po zakończeniu okienko z podsumowaniem albo opisem błędu.
+- **Centrum Alertów:** kopia nieustawiona, brak kopii, brak kopii od X dni, ostatnia kopia nieudana.
+- Kopię robi serwer (zadanie `if-backup`, ustawia je `if-server`); harmonogram — `if-backup-harmonogram.timer`.
+- Strona Narzędzia — sam tester portów. Menu ⚙️: „Odblokuj”.
+
+---
+
 ## v0.3.0 — 2026-10-15
 
 Pierwsza połączona wersja: serwer (if-server), Dockge i strona startowa jako jedna całość.

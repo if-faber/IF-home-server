@@ -479,8 +479,7 @@ a.incident-bar:hover { transform: translateY(-1px); }
 .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(280px, auto) minmax(300px, auto); gap: var(--card-gap); }
 .system-stats-card { grid-column: 1 / -1; }
 .admin-card { padding: 20px; }
-/* Strona Narzędzia: tester portów 70% + Narzędzia Pomocnicze 30% (na wąskim ekranie jedno pod drugim). */
-.tools-layout { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); gap: var(--card-gap); align-items: start; }
+/* Strona Narzędzia: tester portów i kopia zapasowa obok siebie (na wąskim ekranie jedno pod drugim). */
 .panel-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .panel-heading h2 { font-size: 22px; }
 .panel-heading > span { color: var(--muted); font-size: 12px; }
@@ -974,3 +973,6 @@ dialog menu { display: flex; justify-content: flex-end; gap: 8px; margin: 4px 0 
 /* Okienko pytania / komunikatu (ifConfirm, ifAlert w ui-icons.js) — zamiast okienek przeglądarki. */
 dialog.if-confirm { width: min(440px, calc(100vw - 28px)); }
 .if-confirm .if-confirm-message { margin: 0; color: var(--text); font-size: 14px; line-height: 1.55; white-space: pre-line; }
+.incident-bar.backup { background: #0f766e; border-color: #5eead4; color: #ffffff; }
+.backup-progress { display: block; height: 6px; margin-top: 6px; border-radius: 999px; background: rgb(255 255 255 / 0.3); overflow: hidden; }
+.backup-progress > span { display: block; height: 100%; background: #ffffff; transition: width .5s ease; }

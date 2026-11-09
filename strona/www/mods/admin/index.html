@@ -12,10 +12,10 @@
       catch (e) { document.documentElement.dataset.mode = "n"; }
     </script>
     <link rel="stylesheet" href="../../styles.css?v=0.4.2">
-    <link rel="stylesheet" href="./admin.css?v=0.4.2e">
+    <link rel="stylesheet" href="./admin.css?v=0.3.4">
     <link rel="stylesheet" href="../top/top.css?v=0.4.2d">
     <!-- Modułowa architektura Zaplecza IF-startpage (mods/admin) -->
-    <script src="../../ui-icons.js?v=0.4.2c" defer></script>
+    <script src="../../ui-icons.js?v=0.3.5" defer></script>
     <script src="../../shared.js?v=0.4.2" defer></script>
     <script src="../top/top.js?v=0.4.2d" defer></script>
     <script src="./secure.js?v=0.4.2" defer></script>
@@ -26,8 +26,9 @@
     <script src="./tab-modules.js?v=0.4.2" defer></script>
     <script src="./tab-kiosk.js?v=0.4.2c" defer></script>
     <script src="./tab-updates.js?v=0.4.2f" defer></script>
+    <script src="./tab-backup.js?v=0.3.6" defer></script>
     <script src="./tab-admin-theme.js?v=0.4.2c" defer></script>
-    <script src="./admin.js?v=0.4.2d" defer></script>
+    <script src="./admin.js?v=0.3.1" defer></script>
   </head>
   <body class="theme-nas admin-body">
     <div id="adminApp">
@@ -70,6 +71,7 @@
             <button class="nav-button" id="tab-alerts" type="button" data-icon="alerts">Centrum Alertów</button>
             <button class="nav-button" id="tab-live" type="button" data-icon="status">Statystyki Live</button>
             <button class="nav-button" id="tab-updates" type="button" data-icon="package">Aktualizacje</button>
+            <button class="nav-button" id="tab-backup" type="button" data-icon="save">Kopia zapasowa</button>
             <div class="admin-nav-group">Ustawienia</div>
             <!-- tab-kiosk: od v0.4.2 dostępny przez hub "Moduły" (tab-modules.js), bez własnego przycisku w sidebarze -->
             <button class="nav-button" id="tab-modules" type="button" data-icon="modules">Moduły</button>

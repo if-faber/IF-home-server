@@ -1,0 +1,12 @@
+[Unit]
+Description=IF-home-server: kopia zapasowa według harmonogramu — sprawdzenie w nocy
+
+[Timer]
+# Codziennie o 3:00 (z rozrzutem do 15 min); serwer wyłączony o tej porze — sprawdzenie po starcie.
+# Czy kopia jest potrzebna, decyduje if-backup według ustawień (codziennie / co tydzień / tylko ręcznie).
+OnCalendar=*-*-* 03:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

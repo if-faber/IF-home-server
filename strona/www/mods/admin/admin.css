@@ -677,3 +677,48 @@ dialog menu {
 /* Okienko pytania / komunikatu (ifConfirm, ifAlert w ui-icons.js) — zamiast okienek przeglądarki. */
 dialog.if-confirm { width: min(440px, calc(100vw - 28px)); }
 .if-confirm .if-confirm-message { margin: 0; color: var(--text); font-size: 14px; line-height: 1.55; white-space: pre-line; }
+
+/* Zaplecze → Kopia zapasowa (tab-backup.js). */
+.backup-step { margin: 4px 0 10px; font-size: 15px; }
+.backup-disks { display: grid; gap: 8px; }
+.backup-disk { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.backup-disk > span { display: grid; gap: 3px; }
+.backup-disk.is-disabled { opacity: .55; cursor: not-allowed; }
+.backup-disk input { margin-top: 3px; min-height: auto; }
+.backup-disk-warn { display: inline-flex; gap: 6px; align-items: flex-start; color: #d97706; font-size: 12px; line-height: 1.4; }
+.backup-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.backup-estimate { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.backup-badge { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, #10b981 18%, transparent); color: #059669; font-size: 11px; font-weight: 800; }
+.backup-link { min-height: auto; padding: 2px 8px; margin-left: 6px; font-size: 12px; border: none; background: none; color: var(--accent); cursor: pointer; }
+.backup-scope { display: grid; gap: 6px; }
+.backup-scope-item { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.backup-scope-item input, .backup-frequency input { min-height: auto; }
+.backup-important { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; background: color-mix(in srgb, #f59e0b 14%, transparent); color: var(--text); font-size: 13px; line-height: 1.45; }
+.backup-frequency { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 10px; font-size: 14px; }
+.backup-count { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.backup-count input { width: 80px; }
+.backup-now { padding: 12px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 12px; font-size: 14px; }
+.tools-column { display: grid; gap: var(--card-gap); align-content: start; }
+.backup-copies { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.backup-copies li { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.backup-progress-box { padding: 10px 12px; margin-bottom: 12px; border-radius: 12px; background: color-mix(in srgb, #0f766e 16%, transparent); }
+.backup-progress-box .backup-progress { background: color-mix(in srgb, var(--text) 15%, transparent); }
+.backup-progress-box .backup-progress > span { background: #0f766e; }
+.backup-progress { display: block; height: 6px; margin-top: 6px; border-radius: 999px; overflow: hidden; }
+.backup-progress > span { display: block; height: 100%; transition: width .5s ease; }
+.restore-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 10px 0; }
+.restore-form label { display: grid; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.restore-form select { min-width: 200px; }
+/* Postęp kopii / przywracania — przyklejony u góry, widoczny przy przewijaniu. */
+.backup-progress-sticky { position: sticky; top: 0; z-index: 20; }
+.backup-progress-sticky:empty { display: none; }
+.backup-progress-sticky .backup-progress-box { margin-bottom: 14px; background: #0f766e; color: #ffffff; box-shadow: 0 8px 20px rgb(0 0 0 / 0.25); }
+.backup-progress-sticky .backup-progress-box .settings-note { color: rgb(255 255 255 / 0.85); }
+.backup-progress-sticky .backup-progress-box .backup-progress { background: rgb(255 255 255 / 0.3); }
+.backup-progress-sticky .backup-progress-box .backup-progress > span { background: #ffffff; }
+/* Panel „Wykonaj kopię zapasową”: Wszystko (z częściami) albo wybrana aplikacja. */
+.backup-what { display: grid; gap: 10px; margin: 6px 0 4px; }
+.backup-what-option { display: flex; align-items: center; gap: 10px; font-size: 14px; flex-wrap: wrap; }
+.backup-what-option input { min-height: auto; }
+.backup-what .backup-scope { padding-left: 26px; }
+.backup-what select { min-width: 200px; }

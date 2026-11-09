@@ -1,0 +1,11 @@
+[Unit]
+Description=IF-home-server: kopia zapasowa według harmonogramu (codziennie / co tydzień — ustawienia na stronie)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# {user} — twoja nazwa użytkownika. Kolejne foldery config (np. wersja testowa) dopisz po spacji.
+ExecStart=/usr/local/bin/if-backup harmonogram /home/{user}/docker/app-data/if-startpage/config
+Nice=10
+IOSchedulingClass=idle

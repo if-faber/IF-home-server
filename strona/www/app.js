@@ -208,6 +208,7 @@ function appShell() {
           <button type="button" class="sidebar-icon-btn header-bell" id="sidebarIconAlerts" title="Powiadomienia i alerty" aria-label="Powiadomienia i alerty">${uiIcon("alerts", 20)}<span class="sidebar-alert-badge" id="sidebarAlertBadge" style="display:none;">0</span></button>
         </header>
         <div id="headerAlert" class="header-alert-box" style="display: none;"></div>
+        <div id="headerBackup" class="header-alert-box" style="display: none;"></div>
         <section id="content"></section>
       </main>
     </div>
@@ -487,7 +488,7 @@ function bindShell() {
     menu.hidden = !opening;
     menuButton.setAttribute("aria-expanded", String(opening));
     const lock = document.querySelector("#sidebarMenuLock");
-    if (lock) lock.innerHTML = getStoredAdminPin() ? `${uiIcon("lock", 18)} <span>Zablokuj edycję</span>` : `${uiIcon("unlock", 18)} <span>Odblokuj edycję</span>`;
+    if (lock) lock.innerHTML = getStoredAdminPin() ? `${uiIcon("lock", 18)} <span>Zablokuj edycję</span>` : `${uiIcon("unlock", 18)} <span>Odblokuj</span>`;
   });
   document.addEventListener("click", (event) => {
     if (menu && !menu.hidden && !menu.contains(event.target)) closeMenu();
@@ -525,6 +526,8 @@ function bindShell() {
         if (event.data?.type === "services_updated") {
           reloadData().then(() => render());
         }
+        // Kopia albo przywracanie zlecone w Zapleczu — pasek od razu.
+        if (event.data?.type === "backup_started") refreshBackupBar(true);
       };
     }
   } catch {}
@@ -1411,20 +1414,50 @@ function renderToolsPage() {
   stopStatusTopDiagnostics();
   document.querySelector("#viewTitle").textContent = "Narzędzia";
   document.querySelector("#toolbarActions").innerHTML = "";
-  // Tester portów (bez PIN-u) + po prawej „Narzędzia Pomocnicze” — miejsce na menu kolejnych
-  // narzędzi (kopia zapasowa, przygotowanie instalacji); na razie puste.
+  // Strona Narzędzia: tester portów (bez PIN-u). Kopia zapasowa i przywracanie są w Zapleczu
+  // (zakładka „Kopia zapasowa”, Darek 8.11.2026); pozostałe narzędzia — moduły, jak Kiosk.
   document.querySelector("#content").innerHTML = `
-    <div class="tools-layout">
-      <section class="admin-card ports-card">
-        <div class="panel-heading"><div><span class="eyebrow">Sieć</span><h2>Wyszukiwanie i test portów</h2></div></div>
-        <div id="portTool"></div>
-      </section>
-      <section class="admin-card helper-tools-card">
-        <div class="panel-heading"><div><h2>Narzędzia Pomocnicze</h2></div></div>
-      </section>
-    </div>
+    <section class="admin-card ports-card">
+      <div class="panel-heading"><div><span class="eyebrow">Sieć</span><h2>Wyszukiwanie i test portów</h2></div></div>
+      <div id="portTool"></div>
+    </section>
   `;
   renderPortTool();
+}
+
+// ─── Pasek postępu kopii na górze strony (jak pasek alarmów) ─────────────────
+let backupBarTimer = null;
+let backupBarWasRunning = false;
+
+async function refreshBackupBar(soon = false) {
+  clearTimeout(backupBarTimer);
+  const bar = document.querySelector("#headerBackup");
+  let running = soon;
+  try {
+    const s = await request(`${dashboardConfig.apiUrl}/api/tools/backup/status`);
+    running = s.state === "trwa";
+    if (bar) {
+      if (running) {
+        bar.innerHTML = `
+          <div class="incident-bar backup">
+            <span class="incident-bar-icon">${uiIcon("save", 22)}</span>
+            <span class="incident-bar-text">
+              <strong>${s.kind === "przywracanie" ? "Przywracanie" : "Kopia zapasowa"}: ${s.percent}%</strong>
+              <span>${escapeHtml(s.step || "")}</span>
+              <span class="backup-progress"><span style="width:${s.percent}%"></span></span>
+            </span>
+          </div>`;
+        bar.style.display = "flex";
+      } else {
+        bar.innerHTML = "";
+        bar.style.display = "none";
+      }
+    }
+    // Koniec kopii — komunikat i odświeżenie kafelka.
+    if (backupBarWasRunning && !running) backupResultDialog(s);
+  } catch {}
+  backupBarWasRunning = running;
+  backupBarTimer = setTimeout(() => refreshBackupBar(), running ? 3000 : 60000);
 }
 
 function renderAlertsPage() {
@@ -1752,6 +1785,7 @@ function syncSystemStatsPolling() {
   if (shouldPoll && !state.systemStatsTimer) {
     loadSystemStats();
     loadAlertsSummary();
+    refreshBackupBar();
     state.systemStatsTimer = window.setInterval(() => {
       loadSystemStats();
       loadAlertsSummary();

@@ -162,6 +162,25 @@ function ifDialog(message, { title = "Potwierdź", okLabel = "OK", cancelLabel =
   });
 }
 
+// Podsumowanie kopii zapasowej / przywracania po zakończeniu (stan z /api/tools/backup/status).
+function backupResultDialog(s) {
+  const restore = s.kind === "przywracanie";
+  const dt = (iso) => (iso ? new Date(iso).toLocaleString("pl-PL") : "");
+  const size = (b) => (b == null ? "" : b < 1e9 ? `${Math.max(1, Math.round(b / 1e6))} MB` : `${(b / 1e9).toLocaleString("pl-PL", { maximumFractionDigits: 1 })} GB`);
+  if (s.state === "gotowa" && !restore && s.last) {
+    const l = s.last;
+    const what = l.czesciowa ? `tylko aplikacja „${l.czesciowa}”` : "wszystko według ustawień";
+    return ifAlert(`Kopia zapasowa zakończona.\n\nKiedy: ${dt(l.data)}\nCo: ${what}\nWielkość: ${size(l.rozmiar)}\nCzas: ${Math.max(1, Math.round((l.czas_s || 0) / 60))} min\nKopii na dysku: ${(s.copies || []).length}`, { title: "Gotowe" });
+  }
+  if (s.state === "gotowa" && restore && s.lastRestore) {
+    const r = s.lastRestore;
+    const m = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})/.exec(r.kopia || "");
+    const copy = m ? `${Number(m[3])}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : r.kopia;
+    return ifAlert(`Przywracanie zakończone.\n\nCo: ${r.aplikacja}\nZ kopii z: ${copy}\nKiedy: ${dt(r.data)}\n\nDane sprzed przywrócenia (nic nie zostało usunięte):\n${r.odlozone || ""}`, { title: "Gotowe" });
+  }
+  return ifAlert(`${restore ? "Przywracanie nie powiodło się" : "Kopia zapasowa nie powiodła się"}.\n\n${s.message || "Nieznany błąd."}\n\nNic nie zostało usunięte. Sprawdź, czy dysk na kopie jest podłączony, i spróbuj ponownie.`, { title: "Błąd" });
+}
+
 function ifConfirm(message, options = {}) {
   return ifDialog(message, options);
 }

@@ -1,0 +1,10 @@
+[Unit]
+Description=IF-home-server: kopia zapasowa (obsługa zleceń ze strony startowej)
+
+[Service]
+Type=oneshot
+# {user} — twoja nazwa użytkownika. Kolejne foldery config (np. wersja testowa) dopisz po spacji
+# i dodaj do if-backup.path.
+ExecStart=/usr/local/bin/if-backup obsluz /home/{user}/docker/app-data/if-startpage/config
+Nice=10
+IOSchedulingClass=idle

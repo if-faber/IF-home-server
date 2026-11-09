@@ -40,6 +40,7 @@ poprawki samej strony mają trzecią cyfrę (strona v0.3.1, v0.3.2…) i instalu
 | Wykresy w Cockpit | PCP — historia obciążenia |
 | Wyłączenie zbędnych usług | colord, nfs-blkmap |
 | Narzędzia dla IF-startpage | ShellCheck, lista aktualizacji Debiana dla strony startowej (codziennie i od razu po każdej aktualizacji) |
+| Kopia zapasowa | zadanie `if-backup`: kopie i przywracanie według ustawień ze strony (Zaplecze → Kopia zapasowa), harmonogram |
 | IF-startpage (strona startowa) | panel serwera w przeglądarce (`http://<adres-serwera>`), stos `if-startpage` w Dockge; przy Upgrade aktualizuje stronę starszą niż wydana z serwerem |
 
 Wtyczki 45Drives i Docker Manager pochodzą spoza repozytoriów Debiana (45Drives — skrypt

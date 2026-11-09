@@ -211,6 +211,30 @@ Pliki zadania: `strona/extras/system-updates/`.
 Między pakietami systemowymi a kontenerami jest linijka **IF-home-server**: zainstalowana
 i najnowsza wersja programu serwera. Nowszą instalujesz w terminalu: `sudo if-server` → aktualizuj.
 
+## Kopia zapasowa (Zaplecze → Kopia zapasowa)
+
+Kopie robi serwer (zadanie `if-backup`, ustawia je `if-server`) według Twoich ustawień:
+
+- **Konfiguracja** — dysk dla kopii (zalecany zewnętrzny USB), jak często i ile kopii trzymać (osobno dla kopii
+  „Wszystko” i dla kopii każdej aplikacji). Nic nie jest formatowane.
+- **Wykonaj kopię** — „Wszystko” (aplikacje i ich dane, Twoje pliki `/mnt`, ustawienia serwera) albo wybrana aplikacja.
+  Na wybranym dysku folder `IF-kopie`, kopie w folderach z datą; kolejne zajmują tylko zmiany.
+- **Przywracanie** — wszystkie aplikacje albo wybrana; obecne dane trafiają do `~/backups/przed-przywroceniem`.
+
+Brak kopii, kopia za stara albo nieudana — alert w Centrum Alertów.
+
+## Progi alarmów
+
+W Zaplecze → Centrum alertów:
+
+- **Progi temperatur** — dla każdego czujnika próg „Uwaga” (pomarańczowy) i „Alarm”
+  (czerwony). Każdy komputer ma inne normy, więc progi ustawia się dla swojego serwera
+  (`config/temperature-thresholds.json`). Przekroczenie progu pokazuje pasek na Stronie Głównej,
+  dzwonek i Centrum alertów.
+- **Progi obciążenia** — CPU i RAM zmieniają tylko kolor kafelków w nagłówku. Wysokie
+  obciążenie to zwykle praca (np. OCR, galeria zdjęć), a nie awaria, więc bez paska.
+  RAM powyżej 95 % trafia dodatkowo do dzwonka (`config/load-thresholds.json`).
+
 ## Znane ograniczenia
 
 - **Aktualizacje pakietów systemowych (apt)** nie są sprawdzane z wnętrza kontenera —

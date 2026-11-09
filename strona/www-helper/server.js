@@ -2627,6 +2627,9 @@ app.get("/api/alerts/summary", async (req, res) => {
       });
     }
 
+    // Kopia zapasowa — brak ustawień, brak kopii, kopia za stara, ostatnia kopia nieudana (Darek 9.11.2026).
+    alerts.push(...backupAlerts());
+
     const criticalCount = alerts.filter((a) => a.severity === "critical").length;
     const warningCount = alerts.filter((a) => a.severity === "warning").length;
     const infoCount = alerts.filter((a) => a.severity === "info").length;
@@ -2749,6 +2752,175 @@ app.get("/api/system/if-server", async (req, res) => {
     checkedAt: found.checkedAt,
     error: found.error || null
   });
+});
+
+// ─── Kopia zapasowa (robi ją serwer: zadanie if-backup, uruchamiane przez if-backup.path) ─────
+// Strona zostawia w CONFIG_DIR „karteczkę” backup-zlecenie.json; serwer odpowiada plikami
+// backup-dyski.json (dyski i szacunek wielkości) — strona tylko czyta i zapisuje ustawienia.
+const BACKUP_DISKS_FILE = path.join(CONFIG_DIR, "backup-dyski.json");
+const BACKUP_SETTINGS_FILE = path.join(CONFIG_DIR, "backup-ustawienia.json");
+const BACKUP_REQUEST_FILE = path.join(CONFIG_DIR, "backup-zlecenie.json");
+
+function readJsonFile(file) {
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return null; }
+}
+
+function writeJsonFile(file, data) {
+  const tmp = `${file}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
+  fs.renameSync(tmp, file);
+}
+
+// Alerty kopii zapasowej dla Centrum Alertów i dzwonka („Wymaga uwagi”).
+// Próg „brak kopii od X dni” zależy od ustawionej częstotliwości (z zapasem na noc / restart).
+const BACKUP_MAX_AGE_DAYS = { codziennie: 2, "co-tydzien": 8, recznie: 30 };
+
+// Data z zapisu serwera (np. 2026-11-09T03:05:00+01:00) po polsku, w czasie serwera — kontener
+// strony bywa w strefie UTC, więc nie przeliczamy (inaczej godzina wyszłaby przesunięta).
+function serverLocalTime(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(iso || ""));
+  return m ? `${Number(m[3])}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : "";
+}
+
+function backupAlerts() {
+  const settings = readJsonFile(BACKUP_SETTINGS_FILE);
+  const s = readJsonFile(BACKUP_STATE_FILE) || {};
+  const now = new Date().toISOString();
+  const alert = (id, title, message) => ({ id, type: "backup", severity: "warning", title, message, resource: "kopia zapasowa", timestamp: now });
+  if (!settings?.dysk) {
+    return [alert("backup-not-configured", "Kopia zapasowa nie jest ustawiona",
+      "Serwer nie robi kopii zapasowych. Ustaw je w Zaplecze → Kopia zapasowa.")];
+  }
+  const result = [];
+  if (s.ostatnia?.wynik === "blad") {
+    result.push(alert("backup-failed", "Ostatnia kopia zapasowa nie powiodła się",
+      `${s.ostatnia.komunikat || "Nieznany błąd."} (${serverLocalTime(s.ostatnia.data)})`));
+  }
+  // Ostatnia pełna kopia („Wszystko”) — z listy kopii albo z ostatniej udanej.
+  const full = (s.kopie_opis || []).filter((c) => !c.czesciowa && c.data).map((c) => c.data);
+  if (s.ostatnia_pelna) full.push(s.ostatnia_pelna);
+  const lastIso = full.sort((a, b) => Date.parse(a) - Date.parse(b)).pop() || null;
+  const last = lastIso ? Date.parse(lastIso) : null;
+  if (!last) {
+    result.push(alert("backup-none", "Brak kopii zapasowej",
+      "Nie zrobiono jeszcze żadnej pełnej kopii. Zaplecze → Kopia zapasowa → „Zrób kopię teraz”."));
+  } else {
+    const days = Math.floor((Date.now() - last) / 86400000);
+    const maxDays = BACKUP_MAX_AGE_DAYS[settings.czestotliwosc] ?? 2;
+    if (days >= maxDays) {
+      result.push(alert("backup-old", `Brak kopii zapasowej od ${days} dni`,
+        `Ostatnia pełna kopia: ${serverLocalTime(lastIso)}. Sprawdź, czy dysk na kopie jest podłączony.`));
+    }
+  }
+  return result;
+}
+
+app.get("/api/tools/backup/disks", requirePin, (req, res) => {
+  const disks = readJsonFile(BACKUP_DISKS_FILE);
+  res.set("cache-control", "no-store");
+  res.json({
+    ok: true,
+    available: Boolean(disks),
+    checkedAt: disks ? Date.parse(disks.sprawdzono) || null : null,
+    disks: Array.isArray(disks?.dyski) ? disks.dyski : [],
+    estimate: disks?.szacunek || {},
+    apps: Array.isArray(disks?.aplikacje) ? disks.aplikacje : [],
+    settings: readJsonFile(BACKUP_SETTINGS_FILE) || {},
+    pending: fs.existsSync(BACKUP_REQUEST_FILE)
+  });
+});
+
+const BACKUP_STATE_FILE = path.join(CONFIG_DIR, "backup-stan.json");
+
+// Stan kopii — bez PIN-u, bo pokazuje go pasek na górze strony (bez szczegółów ustawień).
+app.get("/api/tools/backup/status", (req, res) => {
+  const s = readJsonFile(BACKUP_STATE_FILE) || {};
+  const settings = readJsonFile(BACKUP_SETTINGS_FILE) || {};
+  // Zlecona, a serwer jeszcze nie zaczął — pokazujemy jako „trwa”, z „Czekam na serwer”.
+  // Zlecenie czeka na serwer — rodzaj pracy bierzemy z karteczki, nie z poprzedniej operacji.
+  const requested = readJsonFile(BACKUP_REQUEST_FILE)?.akcja;
+  const waiting = ["kopia", "przywroc"].includes(requested);
+  res.set("cache-control", "no-store");
+  res.json({
+    ok: true,
+    configured: Boolean(settings.dysk),
+    state: waiting && s.stan !== "trwa" ? "trwa" : (s.stan || null),
+    percent: waiting && s.stan !== "trwa" ? 0 : (Number(s.procent) || 0),
+    step: waiting && s.stan !== "trwa" ? "Czekam na serwer…" : (s.etap || ""),
+    message: s.komunikat || "",
+    kind: waiting && s.stan !== "trwa" ? (requested === "przywroc" ? "przywracanie" : "kopia") : (s.rodzaj || "kopia"),
+    last: s.ostatnia || null,
+    lastRestore: s.przywrocenie || null,
+    copies: Array.isArray(s.kopie) ? s.kopie : [],
+    free: s.wolne ?? null
+  });
+});
+
+// Kopie z listą aplikacji (do przywracania) — pod PIN-em.
+app.get("/api/tools/backup/copies", requirePin, (req, res) => {
+  const s = readJsonFile(BACKUP_STATE_FILE) || {};
+  res.set("cache-control", "no-store");
+  res.json({ ok: true, copies: Array.isArray(s.kopie_opis) ? s.kopie_opis : [] });
+});
+
+// Przywrócenie jednej aplikacji z wybranej kopii — robi serwer (if-backup, akcja „przywroc”).
+app.post("/api/tools/backup/restore", requirePin, (req, res) => {
+  const s = readJsonFile(BACKUP_STATE_FILE) || {};
+  const kopia = normalizeText(req.body?.kopia);
+  const aplikacja = normalizeText(req.body?.aplikacja);
+  const copy = (s.kopie_opis || []).find((c) => c.nazwa === kopia);
+  if (!copy || !(aplikacja === "*" ? copy.aplikacje?.length : (copy.aplikacje || []).includes(aplikacja))) {
+    return res.status(400).json({ error: "Nie ma takiej aplikacji w tej kopii — odśwież listę kopii." });
+  }
+  if (s.stan === "trwa") return res.status(409).json({ error: "Trwa kopia albo przywracanie — poczekaj na koniec." });
+  writeJsonFile(BACKUP_REQUEST_FILE, { akcja: "przywroc", kopia, aplikacja, zlecono: new Date().toISOString() });
+  res.json({ ok: true });
+});
+
+app.post("/api/tools/backup/run", requirePin, (req, res) => {
+  const settings = readJsonFile(BACKUP_SETTINGS_FILE) || {};
+  if (!settings.dysk) return res.status(400).json({ error: "Najpierw wybierz dysk dla kopii zapasowych i zapisz ustawienia." });
+  if ((readJsonFile(BACKUP_STATE_FILE) || {}).stan === "trwa") return res.status(409).json({ error: "Trwa kopia albo przywracanie — poczekaj na koniec." });
+  // Puste = wszystko według ustawień; nazwa aplikacji = kopia tylko tej aplikacji.
+  const aplikacja = normalizeText(req.body?.aplikacja);
+  if (aplikacja && !(readJsonFile(BACKUP_DISKS_FILE)?.aplikacje || []).includes(aplikacja)) {
+    return res.status(400).json({ error: "Nie ma takiej aplikacji — sprawdź dyski jeszcze raz." });
+  }
+  writeJsonFile(BACKUP_REQUEST_FILE, { akcja: "kopia", ...(aplikacja ? { aplikacja } : {}), zlecono: new Date().toISOString() });
+  res.json({ ok: true });
+});
+
+app.post("/api/tools/backup/scan", requirePin, (req, res) => {
+  writeJsonFile(BACKUP_REQUEST_FILE, { akcja: "skanuj", zlecono: new Date().toISOString() });
+  res.json({ ok: true });
+});
+
+// Ustawienia kopii: dysk, zakres (co kopiować), częstotliwość i liczba kopii.
+const BACKUP_FREQUENCIES = ["codziennie", "co-tydzien", "recznie"];
+
+app.put("/api/tools/backup/settings", requirePin, (req, res) => {
+  const disks = readJsonFile(BACKUP_DISKS_FILE);
+  const id = normalizeText(req.body?.dysk);
+  const disk = (disks?.dyski || []).find((d) => d.id === id);
+  if (!disk) return res.status(400).json({ error: "Wybierz dysk z listy (albo sprawdź dyski jeszcze raz)." });
+  if (!disk.nadaje) return res.status(400).json({ error: disk.uwaga || "Ten dysk nie nadaje się na kopie." });
+  const zakres = {
+    aplikacje: req.body?.zakres?.aplikacje !== false,
+    pliki: req.body?.zakres?.pliki !== false,
+    ustawienia: req.body?.zakres?.ustawienia !== false
+  };
+  if (!zakres.aplikacje && !zakres.pliki && !zakres.ustawienia) {
+    return res.status(400).json({ error: "Zaznacz co najmniej jedną rzecz do kopiowania." });
+  }
+  const czestotliwosc = BACKUP_FREQUENCIES.includes(req.body?.czestotliwosc) ? req.body.czestotliwosc : "codziennie";
+  const ile = Math.round(Number(req.body?.ile));
+  if (!Number.isFinite(ile) || ile < 1 || ile > 60) {
+    return res.status(400).json({ error: "Liczba kopii: od 1 do 60." });
+  }
+  const previous = readJsonFile(BACKUP_SETTINGS_FILE) || {};
+  const settings = { ...previous, dysk: disk.id, dyskNazwa: disk.nazwa, zakres, czestotliwosc, ile, zapisano: new Date().toISOString() };
+  writeJsonFile(BACKUP_SETTINGS_FILE, settings);
+  res.json({ ok: true, settings, diskChanged: previous.dysk !== disk.id });
 });
 
 // Wersja IF-startpage (Zaplecze): numer z obrazu tego kontenera; obraz lokalny = „tester”.

@@ -11,7 +11,7 @@
 # od tego, jak Dockge widzi swój katalog stosów.
 services:
   if-startpage:
-    image: ghcr.io/if-faber/if-startpage:v0.3.0
+    image: ghcr.io/if-faber/if-startpage:v0.3.5
     container_name: if-startpage
     restart: unless-stopped
     ports:
