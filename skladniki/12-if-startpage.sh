@@ -6,7 +6,7 @@
 # Kontener IF-startpage nie widzi pakietów serwera. Serwer raz dziennie zapisuje
 # listę oczekujących aktualizacji do folderu danych IF-startpage, a strona ją
 # pokazuje. Pliki: strona/extras/system-updates/ (strona jest częścią tego repozytorium).
-NAZWA="Narzędzia dla IF-startpage"
+NAZWA="$(t 'Narzędzia dla IF-startpage')"
 # WERSJA 3: skrypt zapisuje też wersję if-server (strona pokazuje ją w Aktualizacjach).
 WERSJA=3
 
@@ -14,10 +14,10 @@ sprawdz() {
     local brak
     brak="$(
         brak_pakietow shellcheck
-        [ -x /usr/local/bin/if-system-updates ] || echo "skrypt if-system-updates"
+        [ -x /usr/local/bin/if-system-updates ] || printf '%s\n' "$(t 'skrypt if-system-updates')"
         [ "$(systemctl is-enabled if-system-updates.timer 2>/dev/null)" = "enabled" ] \
-            || echo "zadanie if-system-updates.timer"
-        [ -f /etc/apt/apt.conf.d/99if-system-updates ] || echo "odświeżanie listy po aktualizacji (apt)"
+            || printf '%s\n' "$(t 'zadanie if-system-updates.timer')"
+        [ -f /etc/apt/apt.conf.d/99if-system-updates ] || printf '%s\n' "$(t 'odświeżanie listy po aktualizacji (apt)')"
     )"
     [ "$(printf '%s\n' "$brak" | grep -c .)" -lt 4 ] || return 1
     if [ -x /usr/local/bin/if-system-updates ] \
@@ -32,7 +32,7 @@ zainstaluj() {
     local src="$APP_DIR/strona/extras/system-updates"
     local service=/etc/systemd/system/if-system-updates.service
 
-    run "Sprawdzanie skryptów (shellcheck)" apt-get install -y shellcheck
+    run "$(t 'Sprawdzanie skryptów (shellcheck)')" apt-get install -y shellcheck
 
     install -m 755 "$src/if-system-updates" /usr/local/bin/if-system-updates
     install -m 644 "$src/if-system-updates.timer" /etc/systemd/system/
@@ -43,13 +43,13 @@ zainstaluj() {
         chmod 644 "$service"
     else
         # Mógł być poprawiony ręcznie (np. drugi plik dla wersji testowej) — nie nadpisujemy.
-        info "if-system-updates.service już jest — zostawiam bez zmian"
+        info "$(t 'if-system-updates.service już jest — zostawiam bez zmian')"
     fi
 
-    run "Przeładowanie systemd" systemctl daemon-reload
-    run "Sprawdzanie aktualizacji raz dziennie (if-system-updates.timer)" \
+    run "$(t 'Przeładowanie systemd')" systemctl daemon-reload
+    run "$(t 'Sprawdzanie aktualizacji raz dziennie (if-system-updates.timer)')" \
         systemctl enable --now if-system-updates.timer
     # Lista (i wersja serwera) od razu, nie dopiero w nocy — gdy strona już jest.
-    run "Lista aktualizacji Debiana dla strony" systemctl start --no-block if-system-updates.service
-    info "Lista aktualizacji trafi do: ${USER_HOME}/docker/app-data/if-startpage/config/system-updates.json"
+    run "$(t 'Lista aktualizacji Debiana dla strony')" systemctl start --no-block if-system-updates.service
+    info "$(t 'Lista aktualizacji trafi do: %s/docker/app-data/if-startpage/config/system-updates.json' "${USER_HOME}")"
 }

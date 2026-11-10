@@ -32,9 +32,93 @@ TITLE="IF-home-server"
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"
 APP_DIR="$(dirname "$SELF")"
 COMPONENTS_DIR="$APP_DIR/skladniki"
+LANGS_DIR="$APP_DIR/jezyki"
+LANG_FILE="$STATE_DIR/jezyk"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Języki (od v0.5.0): polski tekst w kodzie jest kluczem, tłumaczenia leżą
+# w jezyki/<kod>.sh jako T['polski tekst']='tłumaczenie'. Brak tłumaczenia →
+# polski tekst. Język wybiera się raz — na pierwszym ekranie (English / Polski)
+# albo poleceniem sudo if-server --en / --pl — i jest zapamiętany w $LANG_FILE.
+# Zmiana później: menu → Język / Language. Dziennik zostaje po polsku.
+# ---------------------------------------------------------------------------
+declare -A T=()
+IF_LANG="pl"
+
+# t 'tekst z %s' wartość... — tekst w wybranym języku z wstawionymi wartościami
+# (jak printf: %s — wartość, %d — liczba, %% — znak procentu).
+# t -k kontekst 'tekst' — gdy to samo polskie słowo ma po angielsku dwa znaczenia
+# (np. „brak” hasła i „brak” składnika): najpierw T['kontekst|tekst'], potem T['tekst'].
+t() {
+    local ctx=""
+    if [ "${1-}" = "-k" ]; then
+        ctx="$2"; shift 2
+    fi
+    local text="$1"; shift
+    if [ -n "$ctx" ] && [ -n "${T[$ctx|$text]+x}" ]; then
+        text="${T[$ctx|$text]}"
+    elif [ -n "${T[$text]+x}" ]; then
+        text="${T[$text]}"
+    fi
+    # shellcheck disable=SC2059  # tekst jest wzorem printf
+    printf -- "$text" "$@"
+}
+
+# Ekran wyboru języka — w obu językach, bo jeszcze nie wiadomo, który rozumie czytający.
+# Wypisuje kod języka; przerwanie (Esc / Wyjście) — kod 1.
+choose_language() {
+    local current="${1:-en}"
+    whiptail --title "IF-home-server" \
+        --ok-button "OK" --cancel-button "Exit / Wyjście" \
+        --default-item "$current" \
+        --menu "Choose the installer language:\nWybierz język instalatora:" 12 60 2 \
+        "en" "English" \
+        "pl" "Polski" \
+        3>&1 1>&2 2>&3
+}
+
+save_language() {
+    mkdir -p "$STATE_DIR"
+    echo "$1" > "$LANG_FILE"
+}
+
+# load_language [--en|--pl] — wybór z polecenia zapisuje, bez niego czyta zapisany.
+# Nic nie zapisane: serwer już zainstalowany (jest plik stanu, przed v0.5.0 wszystkie
+# po polsku) — polski bez pytania; nowy serwer — ekran wyboru języka.
+load_language() {
+    local arg chosen=""
+    for arg in "$@"; do
+        case "$arg" in
+            --en) chosen="en" ;;
+            --pl) chosen="pl" ;;
+        esac
+    done
+    if [ -n "$chosen" ]; then
+        IF_LANG="$chosen"
+        save_language "$chosen"
+    elif [ -f "$LANG_FILE" ]; then
+        # shellcheck disable=SC2018  # kod języka: tylko a–z
+        IF_LANG="$(tr -dc 'a-z' < "$LANG_FILE")"
+    elif [ -f "$STATE_FILE" ]; then
+        IF_LANG="pl"
+        save_language pl
+    else
+        chosen="$(choose_language)" || exit 0
+        IF_LANG="$chosen"
+        save_language "$chosen"
+    fi
+    [ -n "$IF_LANG" ] || IF_LANG="pl"
+    if [ "$IF_LANG" != "pl" ] && [ -f "$LANGS_DIR/$IF_LANG.sh" ]; then
+        # shellcheck disable=SC1090
+        source "$LANGS_DIR/$IF_LANG.sh"
+        # Przyciski, których nie podajemy sami (np. „Cancel” w whiptail), też w tym języku.
+        export LANGUAGE="$IF_LANG"
+    fi
+    export IF_LANG
 }
 
 # ---------------------------------------------------------------------------
@@ -44,15 +128,41 @@ repo_git() {
     git -C "$APP_DIR" "$@"
 }
 
-# Obecna wersja: tag vX.Y.Z wskazujący dokładnie na HEAD albo, dla kopii
-# roboczej, najbliższy tag + skrót commita.
-current_version() {
-    repo_git describe --tags --match 'v[0-9]*' --always 2>/dev/null || echo "nieznana"
+# Wersja zapisana w pliku WERSJA (vX.Y.Z). Tagi wydań leżą na osobnych commitach
+# wydania (GitHub), więc kopia z Gitei (np. gałąź testowa) nie ma tagu w historii —
+# bez tego pliku uważałaby się za v0.0.0 i proponowała „aktualizację” do starszego
+# wydania. Przy wydaniu WERSJA = numer tagu.
+file_version() {
+    local v=""
+    if [ -f "$APP_DIR/WERSJA" ]; then
+        v="$(tr -d '[:space:]' < "$APP_DIR/WERSJA")"
+    fi
+    if [[ "$v" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$v"
+    fi
 }
 
-# Najbliższy tag wersji (bez dopisku o commicie) — do porównań.
+# Wersja do porównań: nowsza z najbliższego tagu i pliku WERSJA.
 current_base_version() {
-    repo_git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo "v0.0.0"
+    local tag file
+    tag="$(repo_git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo "v0.0.0")"
+    file="$(file_version)"
+    if [ -n "$file" ] && version_gt "$file" "$tag"; then
+        echo "$file"
+    else
+        echo "$tag"
+    fi
+}
+
+# Obecna wersja do wyświetlenia: tag vX.Y.Z wskazujący dokładnie na HEAD (wydanie),
+# a dla kopii roboczej wersja + skrót commita, np. v0.5.0+8b6dda0.
+current_version() {
+    local exact
+    if exact="$(repo_git describe --tags --match 'v[0-9]*' --exact-match 2>/dev/null)"; then
+        echo "$exact"
+    else
+        echo "$(current_base_version)+$(repo_git rev-parse --short HEAD 2>/dev/null || echo "?")"
+    fi
 }
 
 # Wszystkie wersje vX.Y.Z w repozytorium origin, od najstarszej.
@@ -76,7 +186,18 @@ whats_new() {
         if version_gt "$tag" "$base"; then
             printf '=== %s ===\n' "$tag"
             # Opis tagu kończy się pustą linią — ona oddziela kolejne wersje.
-            repo_git tag -l --format='%(contents)' "$tag"
+            # Od v0.5.0 opis ma dwie części rozdzielone linią „--- en ---”:
+            # polską i angielską. Starsze opisy (bez tej linii) są tylko po polsku —
+            # w innym języku zamiast polskiego tekstu krótka informacja.
+            repo_git tag -l --format='%(contents)' "$tag" \
+                | awk -v lang="$IF_LANG" -v only_pl="$(t 'Opis tej wersji jest tylko po polsku.')" '
+                    /^--- en ---$/ { split_seen = 1; next }
+                    { lines[++n] = $0; part[n] = split_seen }
+                    END {
+                        if (lang != "pl" && !split_seen) { print only_pl; print ""; exit }
+                        want = (lang == "en" && split_seen) ? 1 : 0
+                        for (i = 1; i <= n; i++) if (!split_seen || part[i] == want) print lines[i]
+                    }'
         fi
     done
 }
@@ -92,7 +213,7 @@ check_for_update() {
         log "Nie udało się pobrać listy wersji albo lista jest pusta"
         if [ -z "$quiet" ]; then
             whiptail --title "$TITLE" --msgbox \
-                "Nie udało się sprawdzić, czy jest nowsza wersja.\n\nSprawdź połączenie z internetem. Szczegóły: $LOG_FILE" 12 64
+                "$(t 'Nie udało się sprawdzić, czy jest nowsza wersja.\n\nSprawdź połączenie z internetem. Szczegóły: %s' "$LOG_FILE")" 12 64
         fi
         return 0
     fi
@@ -102,7 +223,7 @@ check_for_update() {
         log "Brak nowszej wersji (najnowsza: $latest)"
         if [ -z "$quiet" ]; then
             whiptail --title "$TITLE" --msgbox \
-                "Masz najnowszą wersję: $(current_version)" 10 60
+                "$(t 'Masz najnowszą wersję: %s' "$(current_version)")" 10 60
         fi
         return 0
     fi
@@ -111,7 +232,7 @@ check_for_update() {
     if ! repo_git fetch --quiet --tags origin >>"$LOG_FILE" 2>&1; then
         log "Nie udało się pobrać nowych wersji"
         whiptail --title "$TITLE" --msgbox \
-            "Jest nowsza wersja ($latest), ale nie udało się jej pobrać.\n\nSzczegóły: $LOG_FILE" 12 64
+            "$(t 'Jest nowsza wersja (%s), ale nie udało się jej pobrać.\n\nSzczegóły: %s' "$latest" "$LOG_FILE")" 12 64
         return 0
     fi
 
@@ -120,13 +241,13 @@ check_for_update() {
         reversed+=("${versions[i]}")
     done
     whats_new "$base" "${reversed[@]}" > "/tmp/if-server-co-nowego.txt"
-    whiptail --title "Co nowego — $latest" --scrolltext \
+    whiptail --title "$(t 'Co nowego — %s' "$latest")" --scrolltext \
         --textbox "/tmp/if-server-co-nowego.txt" 22 76
     rm -f "/tmp/if-server-co-nowego.txt"
 
     if ! whiptail --title "$TITLE" \
-        --yes-button "Aktualizuj" --no-button "Zostań na obecnej" \
-        --yesno "Jest nowsza wersja narzędzia.\n\nZainstalowana: $(current_version)\nDostępna:      $latest\n\nZaktualizować teraz?" 14 64; then
+        --yes-button "$(t 'Aktualizuj')" --no-button "$(t 'Zostań na obecnej')" \
+        --yesno "$(t 'Jest nowsza wersja narzędzia.\n\nZainstalowana: %s\nDostępna:      %s\n\nZaktualizować teraz?' "$(current_version)" "$latest")" 14 64; then
         log "Użytkownik został na obecnej wersji"
         return 0
     fi
@@ -134,13 +255,13 @@ check_for_update() {
     if ! repo_git -c advice.detachedHead=false checkout --quiet "$latest" >>"$LOG_FILE" 2>&1; then
         log "Aktualizacja do $latest nie powiodła się"
         whiptail --title "$TITLE" --msgbox \
-            "Aktualizacja nie powiodła się — zostaje obecna wersja.\n\nSzczegóły: $LOG_FILE" 12 64
+            "$(t 'Aktualizacja nie powiodła się — zostaje obecna wersja.\n\nSzczegóły: %s' "$LOG_FILE")" 12 64
         return 0
     fi
 
     log "Zaktualizowano do $latest"
     whiptail --title "$TITLE" --msgbox \
-        "Zaktualizowano do wersji $latest.\n\nUruchamiam nową wersję." 10 60
+        "$(t 'Zaktualizowano do wersji %s.\n\nUruchamiam nową wersję.' "$latest")" 10 60
     exec "$SELF"
 }
 
@@ -276,7 +397,7 @@ run() {
     if wait "$pid"; then
         printf "\r  %s... %sOK%s   \n" "$desc" "$GREEN" "$RESET"
     else
-        printf "\r  %s... %sBŁĄD%s \n" "$desc" "$RED" "$RESET"
+        printf "\r  %s... %s%s%s \n" "$desc" "$RED" "$(t 'BŁĄD')" "$RESET"
         return 1
     fi
 }
@@ -300,19 +421,19 @@ upgrade_candidates() {
         s_ver="${saved%% *}"
         reason=""
         case "$state" in
-            brak)     reason="nowy" ;;
+            brak)     reason="$(t 'nowy')" ;;
             niepelny)
                 # Na liście Upgrade mieści się ok. 40 znaków opisu; pełna lista braków
                 # jest w Stanie serwera.
                 if [ "${#missing}" -le 30 ]; then
-                    reason="niepełny, brakuje: $missing"
+                    reason="$(t 'niepełny, brakuje: %s' "$missing")"
                 else
-                    reason="niepełny (braki: Stan serwera)"
+                    reason="$(t 'niepełny (braki: Stan serwera)')"
                 fi
                 ;;
             jest)
                 if [ -n "$s_ver" ] && [ "$s_ver" -lt "$version" ]; then
-                    reason="nowy przepis $s_ver → $version"
+                    reason="$(t 'nowy przepis %s → %s' "$s_ver" "$version")"
                 fi
                 ;;
         esac
@@ -336,7 +457,7 @@ run_upgrade() {
 
     mapfile -t lines < <(upgrade_candidates)
     if [ "${#lines[@]}" -eq 0 ]; then
-        whiptail --title "Upgrade" --msgbox "Wszystkie składniki są zainstalowane i aktualne." 9 60
+        whiptail --title "Upgrade" --msgbox "$(t 'Wszystkie składniki są zainstalowane i aktualne.')" 9 60
         return 0
     fi
 
@@ -346,7 +467,7 @@ run_upgrade() {
     done
     # --notags: na liście tylko opisy, bez technicznych nazw składników.
     chosen=$(whiptail --title "Upgrade" --notags --checklist \
-        "Zaznaczone składniki zostaną zainstalowane albo uzupełnione.\nSpacja — zaznacz / odznacz, Enter — dalej." \
+        "$(t 'Zaznaczone składniki zostaną zainstalowane albo uzupełnione.\nSpacja — zaznacz / odznacz, Enter — dalej.')" \
         20 78 12 "${args[@]}" 3>&1 1>&2 2>&3) || return 0
     read -ra selected <<< "${chosen//\"/}"
     [ "${#selected[@]}" -gt 0 ] || return 0
@@ -368,23 +489,23 @@ run_upgrade() {
         # shellcheck disable=SC1090
         if ! ( source "$file"; if declare -F pytania >/dev/null; then ODPOWIEDZI="$answers" pytania; fi ); then
             rm -f "$answers"
-            whiptail --title "Upgrade" --msgbox "Anulowano — nic nie zostało zainstalowane." 9 60
+            whiptail --title "Upgrade" --msgbox "$(t 'Anulowano — nic nie zostało zainstalowane.')" 9 60
             return 0
         fi
     done
 
-    if ! whiptail --title "Upgrade" --yes-button "Instaluj" --no-button "Anuluj" \
-        --yesno "Do zainstalowania:\n\n$(printf ' - %s\n' "${names[@]}")\n\nZaczynamy?" 22 70; then
+    if ! whiptail --title "Upgrade" --yes-button "$(t 'Instaluj')" --no-button "$(t 'Anuluj')" \
+        --yesno "$(t 'Do zainstalowania:\n\n%s\n\nZaczynamy?' "$(printf ' - %s\n' "${names[@]}")")" 22 70; then
         rm -f "$answers"
         return 0
     fi
 
     clear
-    printf "%s%s=== Upgrade: %d składn. ===%s\n" "$CYAN" "$BOLD" "${#files[@]}" "$RESET"
+    printf "%s%s=== %s ===%s\n" "$CYAN" "$BOLD" "$(t 'Upgrade: %d składn.' "${#files[@]}")" "$RESET"
     log "Upgrade: ${selected[*]}"
     export DEBIAN_FRONTEND=noninteractive
-    if ! run "Aktualizacja listy pakietów" apt-get update; then
-        failed="lista pakietów"
+    if ! run "$(t 'Aktualizacja listy pakietów')" apt-get update; then
+        failed="$(t 'lista pakietów')"
     fi
 
     for i in "${!files[@]}"; do
@@ -425,16 +546,16 @@ run_upgrade() {
 
     echo
     if [ -z "$failed" ]; then
-        printf "%s%sGotowe: zainstalowano %d z %d.%s\n" "$GREEN" "$BOLD" "$done_count" "${#files[@]}" "$RESET"
+        printf "%s%s%s%s\n" "$GREEN" "$BOLD" "$(t 'Gotowe: zainstalowano %d z %d.' "$done_count" "${#files[@]}")" "$RESET"
     else
-        printf "%s%sPrzerwano na: %s. Zainstalowano %d z %d.%s\n" "$RED" "$BOLD" "$failed" "$done_count" "${#files[@]}" "$RESET"
-        echo "  Szczegóły w dzienniku: $LOG_FILE"
+        printf "%s%s%s%s\n" "$RED" "$BOLD" "$(t 'Przerwano na: %s. Zainstalowano %d z %d.' "$failed" "$done_count" "${#files[@]}")" "$RESET"
+        echo "  $(t 'Szczegóły w dzienniku: %s' "$LOG_FILE")"
     fi
     if [ "$reboot" -eq 1 ]; then
-        warn "Zalecany restart serwera: sudo reboot"
+        warn "$(t 'Zalecany restart serwera: sudo reboot')"
     fi
     echo
-    read -rp "Naciśnij Enter, aby wrócić do menu... " _
+    read -rp "$(t 'Naciśnij Enter, aby wrócić do menu... ')" _
 }
 
 # ---------------------------------------------------------------------------
@@ -478,11 +599,11 @@ recognize_components() {
 
     if [ "${#found[@]}" -gt 0 ]; then
         whiptail --title "$TITLE" --msgbox \
-"Rozpoznałem składniki, które już są na tym serwerze (liczba: ${#found[@]}).
+"$(t 'Rozpoznałem składniki, które już są na tym serwerze (liczba: %d).
 
 Zapisałem je w stanie serwera — nic nie zostało zainstalowane ani zmienione.
 
-Szczegóły: menu → Stan serwera." 14 70
+Szczegóły: menu → Stan serwera.' "${#found[@]}")" 14 70
     fi
 }
 
@@ -530,75 +651,73 @@ root_password_state() {
 set_root_password() {
     local intro pass1 pass2
     if [ "$(root_password_state)" = "ustawione" ]; then
-        intro="Hasło konta root jest już ustawione.
+        intro="$(t 'Hasło konta root jest już ustawione.
 
-Zmienić je?"
+Zmienić je?')"
     else
-        intro="Konto root nie ma hasła — tak jest dobrze na co dzień: do pracy \
-administratora służy sudo i hasło Twojego konta.
+        intro="$(t 'Konto root nie ma hasła — tak jest dobrze na co dzień: do pracy administratora służy sudo i hasło Twojego konta.
 
-Hasło roota przydaje się w trybie awaryjnym, gdy serwer nie chce się \
-uruchomić — wtedy Debian prosi właśnie o nie.
+Hasło roota przydaje się w trybie awaryjnym, gdy serwer nie chce się uruchomić — wtedy Debian prosi właśnie o nie.
 
-Ustawić hasło konta root? Zapisz je w bezpiecznym miejscu \
-(np. w menedżerze haseł) — to inne hasło niż hasło Twojego konta."
+Ustawić hasło konta root? Zapisz je w bezpiecznym miejscu (np. w menedżerze haseł) — to inne hasło niż hasło Twojego konta.')"
     fi
-    whiptail --title "Hasło konta root" --yes-button "Ustaw" --no-button "Anuluj" \
+    whiptail --title "$(t 'Hasło konta root')" --yes-button "$(t 'Ustaw')" --no-button "$(t 'Anuluj')" \
         --yesno "$intro" 18 70 || return 0
 
-    pass1=$(whiptail --title "Hasło konta root" \
-        --passwordbox "Wpisz nowe hasło konta root:" 10 64 3>&1 1>&2 2>&3) || return 0
-    pass2=$(whiptail --title "Hasło konta root" \
-        --passwordbox "Wpisz to samo hasło jeszcze raz:" 10 64 3>&1 1>&2 2>&3) || return 0
+    pass1=$(whiptail --title "$(t 'Hasło konta root')" \
+        --passwordbox "$(t 'Wpisz nowe hasło konta root:')" 10 64 3>&1 1>&2 2>&3) || return 0
+    pass2=$(whiptail --title "$(t 'Hasło konta root')" \
+        --passwordbox "$(t 'Wpisz to samo hasło jeszcze raz:')" 10 64 3>&1 1>&2 2>&3) || return 0
 
     if [ -z "$pass1" ]; then
-        whiptail --title "Hasło konta root" --msgbox "Hasło nie może być puste. Nic nie zmieniłem." 9 64
+        whiptail --title "$(t 'Hasło konta root')" --msgbox "$(t 'Hasło nie może być puste. Nic nie zmieniłem.')" 9 64
         return 0
     fi
     if [ "$pass1" != "$pass2" ]; then
-        whiptail --title "Hasło konta root" --msgbox "Hasła się różnią. Nic nie zmieniłem — spróbuj jeszcze raz." 9 64
+        whiptail --title "$(t 'Hasło konta root')" --msgbox "$(t 'Hasła się różnią. Nic nie zmieniłem — spróbuj jeszcze raz.')" 9 64
         return 0
     fi
 
     # printf to polecenie wbudowane — hasło nie pojawia się na liście procesów.
     if printf 'root:%s\n' "$pass1" | chpasswd >>"$LOG_FILE" 2>&1; then
         log "Ustawiono hasło konta root"
-        whiptail --title "Hasło konta root" --msgbox "Hasło konta root ustawione." 9 64
+        whiptail --title "$(t 'Hasło konta root')" --msgbox "$(t 'Hasło konta root ustawione.')" 9 64
     else
         log "Nie udało się ustawić hasła konta root"
-        whiptail --title "Hasło konta root" --msgbox \
-            "Nie udało się ustawić hasła (np. za proste?). Szczegóły: $LOG_FILE" 10 64
+        whiptail --title "$(t 'Hasło konta root')" --msgbox \
+            "$(t 'Nie udało się ustawić hasła (np. za proste?). Szczegóły: %s' "$LOG_FILE")" 10 64
     fi
 }
 
 server_status_text() {
     local id name version state missing info saved s_ver s_date s_how line root_state
-    echo "$(pad "Narzędzie if-server" 28) $(current_version)"
-    echo "$(pad "Użytkownik serwera" 28) $TARGET_USER ($USER_HOME)"
+    echo "$(pad "$(t 'Narzędzie if-server')" 28) $(current_version)"
+    echo "$(pad "$(t 'Użytkownik serwera')" 28) $TARGET_USER ($USER_HOME)"
     root_state="$(root_password_state)"
-    echo "$(pad "Hasło konta root" 28) $root_state"
+    echo "$(pad "$(t 'Hasło konta root')" 28) $(t -k haslo "$root_state")"
     if [ "$root_state" = "brak" ]; then
-        note_line "przyda się w trybie awaryjnym — menu 4"
+        note_line "$(t 'przyda się w trybie awaryjnym — menu 4')"
     fi
     echo
-    echo "SKŁADNIKI"
+    t 'SKŁADNIKI'
+    echo
     while IFS='|' read -r id name version state missing info; do
         saved="$(state_get "$id")"
         read -r s_ver s_date s_how <<< "$saved"
         case "$state" in
             jest)
                 if [ -n "$saved" ]; then
-                    line="jest — przepis $s_ver, $s_how $s_date"
+                    line="$(t 'jest — przepis %s, %s %s' "$s_ver" "$(t "$s_how")" "$s_date")"
                 else
-                    line="jest — nie zapisany w stanie"
+                    line="$(t 'jest — nie zapisany w stanie')"
                 fi
                 ;;
-            niepelny) line="NIEPEŁNY" ;;
+            niepelny) line="$(t 'NIEPEŁNY')" ;;
             brak)
                 if [ -n "$saved" ]; then
-                    line="BRAK — choć zapisany ($s_how $s_date)"
+                    line="$(t 'BRAK — choć zapisany (%s %s)' "$(t "$s_how")" "$s_date")"
                 else
-                    line="brak"
+                    line="$(t 'brak')"
                 fi
                 ;;
         esac
@@ -608,7 +727,7 @@ server_status_text() {
             note_line "$info"
         fi
         if [ -n "$missing" ]; then
-            note_line "brakuje: $missing"
+            note_line "$(t 'brakuje: %s' "$missing")"
         fi
     done < <(check_all_components)
 }
@@ -624,7 +743,7 @@ show_server_status() {
     [ "$max" -ge 24 ] || max=24
     [ "$height" -le "$max" ] || height="$max"
     [ "$height" -ge 24 ] || height=24
-    whiptail --title "Stan serwera" --scrolltext --textbox "$tmp" "$height" 78
+    whiptail --title "$(t 'Stan serwera')" --scrolltext --textbox "$tmp" "$height" 78
     rm -f "$tmp"
 }
 
@@ -632,16 +751,17 @@ show_server_status() {
 # Menu główne
 # ---------------------------------------------------------------------------
 main_menu() {
-    local choice
+    local choice lang
     while true; do
-        choice=$(whiptail --title "$TITLE — wersja $(current_version)" \
-            --cancel-button "Wyjście" \
-            --menu "Co chcesz zrobić?" 16 70 5 \
-            "1" "Stan serwera" \
-            "2" "Upgrade — zainstaluj i zaktualizuj składniki" \
-            "3" "Sprawdź, czy jest nowsza wersja narzędzia" \
-            "4" "Hasło konta root (na tryb awaryjny)" \
-            "5" "O narzędziu" \
+        choice=$(whiptail --title "$TITLE — $(t 'wersja %s' "$(current_version)")" \
+            --cancel-button "$(t 'Wyjście')" \
+            --menu "$(t 'Co chcesz zrobić?')" 17 70 6 \
+            "1" "$(t 'Stan serwera')" \
+            "2" "$(t 'Upgrade — zainstaluj i zaktualizuj składniki')" \
+            "3" "$(t 'Sprawdź, czy jest nowsza wersja narzędzia')" \
+            "4" "$(t 'Hasło konta root (na tryb awaryjny)')" \
+            "5" "$(t 'O narzędziu')" \
+            "6" "Język / Language" \
             3>&1 1>&2 2>&3) || return 0
 
         case "$choice" in
@@ -649,15 +769,23 @@ main_menu() {
             2) run_upgrade ;;
             3) check_for_update ;;
             4) set_root_password ;;
-            5) whiptail --title "O narzędziu" --msgbox \
-"IF-home-server — narzędzie serwera domowego.
+            5) whiptail --title "$(t 'O narzędziu')" --msgbox \
+"$(t 'IF-home-server — narzędzie serwera domowego.
 
-Zainstalowana wersja: $(current_version)
-Miejsce: $APP_DIR
-Stan serwera: $STATE_FILE
-Dziennik: $LOG_FILE
+Zainstalowana wersja: %s
+Miejsce: %s
+Stan serwera: %s
+Dziennik: %s
+Język: %s (zmiana: menu → Język / Language)
 
-https://github.com/if-faber/IF-home-server" 17 70 ;;
+https://github.com/if-faber/IF-home-server' "$(current_version)" "$APP_DIR" "$STATE_FILE" "$LOG_FILE" "$IF_LANG")" 18 70 ;;
+            6)
+                if lang="$(choose_language "$IF_LANG")" && [ "$lang" != "$IF_LANG" ]; then
+                    save_language "$lang"
+                    log "Zmiana języka na $lang"
+                    exec "$SELF"
+                fi
+                ;;
         esac
     done
 }
@@ -675,25 +803,28 @@ main() {
         LOG_FILE="/tmp/if-server.log"
     fi
 
+
     local tool
     for tool in git whiptail; do
         if ! command -v "$tool" >/dev/null 2>&1; then
-            echo "BŁĄD: brak programu '$tool'. Zainstaluj go poleceniem:" >&2
+            { t "BŁĄD: brak programu '%s'. Zainstaluj go poleceniem:" "$tool"; echo; } >&2
             echo "  sudo apt install -y $tool" >&2
             exit 1
         fi
     done
 
     if [ ! -t 0 ] || [ ! -t 1 ]; then
-        echo "BŁĄD: if-server potrzebuje terminala (np. PuTTY)." >&2
+        { t 'BŁĄD: if-server potrzebuje terminala (np. PuTTY).'; echo; } >&2
         exit 1
     fi
 
     # Bez tego ramki whiptail w PuTTY bywają „krzaczkowate” (jak w install-myhome.sh).
     export NCURSES_NO_UTF8_ACS=1
 
+    load_language "$@"
+
     if [ -z "${TARGET_USER-}" ] && ! TARGET_USER="$(detect_target_user)"; then
-        echo "BŁĄD: nie udało się wykryć użytkownika serwera. Uruchom: TARGET_USER=nazwa sudo -E if-server" >&2
+        { t 'BŁĄD: nie udało się wykryć użytkownika serwera. Uruchom: TARGET_USER=nazwa sudo -E if-server'; echo; } >&2
         exit 1
     fi
     USER_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
@@ -708,7 +839,7 @@ main() {
         fi
     fi
 
-    log "=== start, wersja $(current_version), $APP_DIR, użytkownik $TARGET_USER ==="
+    log "=== start, wersja $(current_version), $APP_DIR, użytkownik $TARGET_USER, język $IF_LANG ==="
     check_for_update quiet
     recognize_components
     main_menu

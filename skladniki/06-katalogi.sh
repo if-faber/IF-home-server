@@ -3,7 +3,7 @@
 #
 # Zasada dwufolderowa: pliki definicji stosów → docker/app/<usługa>/,
 # dane trwałe (wolumeny/config/bazy) → docker/app-data/<usługa>/
-NAZWA="Katalogi serwera"
+NAZWA="$(t 'Katalogi serwera')"
 WERSJA=1
 
 KATALOGI=(docker/app docker/app-data documentation backups blog creativity)
@@ -24,6 +24,6 @@ zainstaluj() {
     chown -R "${TARGET_USER}:${TARGET_USER}" \
         "${USER_HOME}/docker" "${USER_HOME}/documentation" "${USER_HOME}/backups" \
         "${USER_HOME}/blog" "${USER_HOME}/creativity"
-    info "Katalogi: ${KATALOGI[*]}"
-    warn "Duże biblioteki danych (zdjęcia, filmy) montuj poza katalogiem domowym, np. w /mnt/."
+    info "$(t 'Katalogi: %s' "${KATALOGI[*]}")"
+    warn "$(t 'Duże biblioteki danych (zdjęcia, filmy) montuj poza katalogiem domowym, np. w /mnt/.')"
 }

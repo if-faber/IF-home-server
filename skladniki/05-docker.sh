@@ -19,7 +19,7 @@ dns_z_routera() {
 sprawdz() {
     pakiet_jest docker-ce || return 1
     brak_pakietow docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    grep -qs '"dns"' "$DOCKER_DAEMON_JSON" || echo "stałe DNS dla aplikacji (daemon.json)"
+    grep -qs '"dns"' "$DOCKER_DAEMON_JSON" || printf '%s\n' "$(t 'stałe DNS dla aplikacji (daemon.json)')"
 }
 
 # Wpisuje DNS do daemon.json i uruchamia Dockera ponownie. Istniejącego pliku bez DNS
@@ -27,12 +27,12 @@ sprawdz() {
 ustaw_dns_dockera() {
     local adresy lista adres
     if grep -qs '"dns"' "$DOCKER_DAEMON_JSON"; then
-        info "DNS dla aplikacji już jest w ${DOCKER_DAEMON_JSON}"
+        info "$(t 'DNS dla aplikacji już jest w %s' "${DOCKER_DAEMON_JSON}")"
         return 0
     fi
     adresy="$(dns_z_routera)"
     if [ -z "$adresy" ]; then
-        warn "Nie znalazłem serwerów DNS od routera w /etc/resolv.conf — pomijam (aplikacje użyją ustawień Dockera)"
+        warn "$(t 'Nie znalazłem serwerów DNS od routera w /etc/resolv.conf — pomijam (aplikacje użyją ustawień Dockera)')"
         return 0
     fi
     lista=""
@@ -41,23 +41,23 @@ ustaw_dns_dockera() {
     done <<< "$adresy"
     lista="[${lista%, }]"
     if [ -f "$DOCKER_DAEMON_JSON" ]; then
-        warn "${DOCKER_DAEMON_JSON} już istnieje (inne ustawienia) — nie nadpisuję. Dopisz w nim: \"dns\": ${lista}"
+        warn "$(t '%s już istnieje (inne ustawienia) — nie nadpisuję. Dopisz w nim: "dns": %s' "${DOCKER_DAEMON_JSON}" "${lista}")"
         return 0
     fi
     install -m 0755 -d /etc/docker
     printf '{ "dns": %s }\n' "$lista" > "$DOCKER_DAEMON_JSON"
     chmod 644 "$DOCKER_DAEMON_JSON"
-    info "DNS dla aplikacji: ${lista}"
-    warn "Ponowne uruchomienie Dockera — aplikacje znikną na kilkanaście sekund"
-    run "Ponowne uruchomienie Dockera" systemctl restart docker
+    info "$(t 'DNS dla aplikacji: %s' "${lista}")"
+    warn "$(t 'Ponowne uruchomienie Dockera — aplikacje znikną na kilkanaście sekund')"
+    run "$(t 'Ponowne uruchomienie Dockera')" systemctl restart docker
 }
 
 zainstaluj() {
-    run "Zależności (ca-certificates, gnupg...)" apt-get install -y ca-certificates curl gnupg
+    run "$(t 'Zależności (ca-certificates, gnupg...)')" apt-get install -y ca-certificates curl gnupg
     install -m 0755 -d /etc/apt/keyrings
 
     if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
-        run_sh "Klucz GPG Dockera" \
+        run_sh "$(t 'Klucz GPG Dockera')" \
             "curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg"
     fi
     chmod a+r /etc/apt/keyrings/docker.gpg
@@ -66,11 +66,11 @@ zainstaluj() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         > /etc/apt/sources.list.d/docker.list
 
-    run "Aktualizacja listy pakietów" apt-get update
-    run "Instalacja silnika Docker" apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    run "$(t 'Aktualizacja listy pakietów')" apt-get update
+    run "$(t 'Instalacja silnika Docker')" apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     usermod -aG docker "$TARGET_USER"
-    info "Dodano '${TARGET_USER}' do grupy docker"
+    info "$(t "Dodano '%s' do grupy docker" "${TARGET_USER}")"
 
     ustaw_dns_dockera
 }

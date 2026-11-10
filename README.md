@@ -1,62 +1,67 @@
 # IF-home-server
 
-Domowy serwer na Debianie 13 dla osób nietechnicznych: **program serwera `if-server`,
-Dockge i strona startowa IF-startpage — jedna całość, instalowana razem i poprawnie.**
-Część pakietu **IdeaForge**.
+[Polski](README.pl.md) · **English**
 
-- `if-server` — program, który zostaje na serwerze (`sudo if-server`): instaluje, uzupełnia
-  i aktualizuje wszystkie składniki (podobnie jak KIAUH dla Klippera).
-- [`strona/`](strona/) — strona startowa serwera w przeglądarce (`http://<adres-serwera>`),
-  z Zapleczem (PIN), stanem serwera, alertami, aktualizacjami, Instalatorem aplikacji
-  i kopią zapasową.
+A home server on Debian 13 for non-technical people: **the `if-server` program,
+Dockge and the IF-startpage start page — one whole, installed together and correctly.**
+Part of the **IdeaForge** package.
 
-**Wersje (od 0.3.0):** druga cyfra jest wspólna dla serwera i strony (0.3, 0.4…). Drobne
-poprawki mają trzecią cyfrę (v0.4.1, v0.4.2…); stronę aktualizuje Upgrade albo przycisk
-„Aktualizuj” w Zapleczu → Aplikacje.
+- `if-server` — a program that stays on the server (`sudo if-server`): it installs, completes
+  and updates all components (similar to KIAUH for Klipper).
+- [`strona/`](strona/) — the server's start page in the browser (`http://<server-address>`),
+  with a PIN-protected back office (Zaplecze), server status, alerts, updates, an app installer
+  and backup.
 
-## Funkcje
+**Languages:** the `if-server` program speaks English or Polish (chosen on the first screen).
+The start page is in Polish for now; English is the next step.
 
-- **Stan serwera** — każdy składnik: jest / niepełny (czego brakuje) / brak.
-- **Upgrade** — instaluje nowe składniki, uzupełnia niepełne, aktualizuje te, których
-  przepis się zmienił. Na czystym Debianie to pełna instalacja.
-- **Aktualizacja programu** — przy starcie sprawdza nowszą wersję, pokazuje „Co nowego”,
-  pyta: aktualizuj / zostań na obecnej.
-- **Rozpoznanie istniejącej instalacji** — serwer postawiony starym skryptem
-  (`install-myhome.sh`) jest rozpoznawany bez instalowania czegokolwiek od nowa.
-- **Kopia zapasowa i przywracanie** — według ustawień ze strony startowej (dysk, jak często,
-  ile kopii); kolejne kopie zajmują tylko zmiany; przywracanie wszystkich aplikacji albo jednej.
-- **Aplikacje** — Instalator (compose z repozytorium aplikacji dopasowany do serwera: dane
-  w `app-data`, stała wersja, wolne porty) i aktualizacje jednym przyciskiem: kopia, nowa wersja,
-  sprawdzenie, a przy błędzie powrót do poprzedniej wersji razem z danymi.
-- **Hasło konta root** — opcjonalnie, na tryb awaryjny (przy instalacji Debiana
-  hasło roota zostawiamy puste — Debian sam daje wtedy `sudo`).
+**Versions (since 0.3.0):** the second digit is shared by the server and the page (0.3, 0.4…).
+Small fixes get the third digit (v0.4.1, v0.4.2…); the page is updated by Upgrade or by the
+“Aktualizuj” (Update) button in Zaplecze → Aplikacje.
 
-## Instalowane aplikacje (składniki)
+## Features
 
-| Składnik | Co zawiera |
+- **Server status** — each component: present / incomplete (what is missing) / not installed.
+- **Upgrade** — installs new components, completes incomplete ones, updates those whose
+  recipe has changed. On a clean Debian it is a full installation.
+- **Program updates** — on start it checks for a newer version, shows “What is new”
+  and asks: update / keep current.
+- **Recognizing an existing installation** — a server set up with the old script
+  (`install-myhome.sh`) is recognized without reinstalling anything.
+- **Backup and restore** — following the settings on the start page (disk, how often,
+  how many copies); later copies take only the changes; restore all apps or just one.
+- **Apps** — an installer (the compose file from the app's repository, adjusted to the server:
+  data in `app-data`, a fixed version, free ports) and one-click updates: a copy, the new version,
+  a check, and if something goes wrong, a return to the previous version together with its data.
+- **Root account password** — optional, for emergency mode (when installing Debian we leave
+  the root password empty — Debian then sets up `sudo` by itself).
+
+## Installed components
+
+| Component | What it contains |
 |---|---|
-| Podstawy systemu | sudo, curl, git, lsb-release |
-| Cichy start | wyciszony rozruch (GRUB) i logi jądra |
-| Pakiety systemowe | SSH, avahi (`.local`), smartmontools, lm-sensors, sysstat, htop, cifs-utils, nfs-common, Node.js, Python (pip, venv) |
-| Druk i skanowanie | CUPS (serwer albo klient), sane-utils |
-| Docker | Docker z oficjalnego repozytorium, Docker Compose |
-| Katalogi serwera | `~/docker/app`, `~/docker/app-data` i foldery robocze |
-| Dockge | menedżer stosów Docker Compose (port 5001) |
-| Samba | udostępnianie plików w sieci domowej |
-| Cockpit i wtyczki | panel serwera (port 9090), moduły dysków, sosreport, 45Drives (Navigator, File Sharing, Identities), Explorer, Docker Manager, CTOP |
-| Wykresy w Cockpit | PCP — historia obciążenia |
-| Wyłączenie zbędnych usług | colord, nfs-blkmap |
-| Narzędzia dla IF-startpage | ShellCheck, lista aktualizacji Debiana dla strony startowej (codziennie i od razu po każdej aktualizacji) |
-| Kopia zapasowa | zadanie `if-backup`: kopie i przywracanie według ustawień ze strony (Zaplecze → Kopia zapasowa), harmonogram |
-| Instalator aplikacji | zadanie `if-aplikacje`: zakłada aplikację przygotowaną na stronie (Zaplecze → Aplikacje → Instalator) — foldery z prawami użytkownika, sprawdzenie compose |
-| IF-startpage (strona startowa) | panel serwera w przeglądarce (`http://<adres-serwera>`), stos `if-startpage` w Dockge; przy Upgrade aktualizuje stronę starszą niż wydana z serwerem |
+| System basics | sudo, curl, git, lsb-release |
+| Quiet boot | quiet boot (GRUB) and kernel logs |
+| System packages | SSH, avahi (`.local`), smartmontools, lm-sensors, sysstat, htop, cifs-utils, nfs-common, Node.js, Python (pip, venv) |
+| Printing and scanning | CUPS (server or client), sane-utils |
+| Docker | Docker from the official repository, Docker Compose |
+| Server folders | `~/docker/app`, `~/docker/app-data` and working folders |
+| Dockge | Docker Compose stack manager (port 5001) |
+| Samba | file sharing on the home network |
+| Cockpit and plugins | server panel (port 9090), disk modules, sosreport, 45Drives (Navigator, File Sharing, Identities), Explorer, Docker Manager, CTOP |
+| Charts in Cockpit | PCP — load history |
+| Unneeded services off | colord, nfs-blkmap |
+| Tools for IF-startpage | ShellCheck, the Debian update list for the start page (daily and right after every update) |
+| Backup | the `if-backup` task: copies and restore following the settings on the page (Zaplecze → Kopia zapasowa), schedule |
+| App installer | the `if-aplikacje` task: sets up an app prepared on the page (Zaplecze → Aplikacje → Instalator) — folders with user rights, compose check |
+| IF-startpage (start page) | server panel in the browser (`http://<server-address>`), the `if-startpage` stack in Dockge; Upgrade updates a page older than the one released with the server |
 
-Wtyczki 45Drives i Docker Manager pochodzą spoza repozytoriów Debiana (45Drives — skrypt
-`curl | bash` z uprawnieniami roota, Docker Manager — repozytorium bez sprawdzania podpisu).
+The 45Drives and Docker Manager plugins come from outside the Debian repositories (45Drives — a
+`curl | bash` script run as root, Docker Manager — a repository without signature checking).
 
-## Instalacja
+## Installation
 
-Debian 13 (netinst) z „SSH server”, hasło roota puste, najlepiej na kablu sieciowym. Potem:
+Debian 13 (netinst) with “SSH server”, empty root password, preferably on a network cable. Then:
 
 ```sh
 sudo apt install -y git
@@ -64,28 +69,30 @@ sudo git clone https://github.com/if-faber/IF-home-server.git /opt/if-home-serve
 sudo /opt/if-home-server/if-server.sh
 ```
 
-W menu: **Upgrade** — program zapyta m.in. o hasło do udostępniania plików i PIN do strony
-startowej. Później wystarczy `sudo if-server`. Strona startowa: `http://<adres-serwera>`.
+The first screen asks for the language (English / Polski). In the menu: **Upgrade** — the program asks, among other things, for a file sharing password and
+a PIN for the start page. After that, `sudo if-server` is enough — the language is remembered.
+Change the language: menu → Język / Language. Start page: `http://<server-address>`.
 
-## Testy
+## Tests
 
-| Test | Sprzęt | Wynik |
+| Test | Hardware | Result |
 |---|---|---|
-| Czysta instalacja Debiana 13 i Upgrade wszystkich składników | HP t730 Thin Client | 12 z 12, Cockpit i Dockge działają po restarcie |
-| Serwer zainstalowany starym skryptem: rozpoznanie i uzupełnienie | HP t730 Thin Client | rozpoznane 10 składników, uzupełnione 2 |
-| Rozpoznanie, aktualizacje programu, hasło roota | Fujitsu Esprimo Q920 | bez błędów |
-| 0.4: kopia zapasowa (4,5 GB w 45 s) i przywracanie aplikacji | serwer testowy, dysk USB | kopie i przywracanie bez błędów |
-| 0.4: Instalator (LubeLogger z compose z GitHuba) | serwer testowy | aplikacja działa po Deploy w Dockge |
-| 0.4.1: aktualizacja aplikacji — udana, nieistniejąca wersja, wersja padająca | serwer testowy | powrót do poprzedniej wersji z danymi |
+| Clean Debian 13 installation and Upgrade of all components | HP t730 Thin Client | 12 of 12, Cockpit and Dockge work after restart |
+| Server installed with the old script: recognition and completion | HP t730 Thin Client | 10 components recognized, 2 completed |
+| Recognition, program updates, root password | Fujitsu Esprimo Q920 | no errors |
+| 0.4: backup (4.5 GB in 45 s) and app restore | test server, USB disk | copies and restore without errors |
+| 0.4: Installer (LubeLogger from a compose file on GitHub) | test server | the app works after Deploy in Dockge |
+| 0.4.1: app update — successful, non-existent version, crashing version | test server | return to the previous version with data |
+| 0.5.0: clean Debian 13 installation in English — every window and step | Dell Wyse | 15 of 15, start page and Dockge work |
 
-## Historia projektu
+## Project history
 
-Do wersji 0.2.5 serwer i strona były osobnymi projektami (strona: repozytorium
-[if-startpage](https://github.com/if-faber/if-startpage), ostatnia osobna wersja v0.1.7.2).
-Połączone w v0.3.0: drobne niezgodności przy łączeniu dwóch projektów wymagały wiedzy
-i terminala — jako jedna całość instalują się poprawnie. Historia zmian strony:
+Up to version 0.2.5 the server and the page were separate projects (page: the
+[if-startpage](https://github.com/if-faber/if-startpage) repository, last separate version v0.1.7.2).
+Merged in v0.3.0: small mismatches when combining two projects required knowledge
+and the terminal — as one whole they install correctly. Page change history (in Polish):
 [strona/version-changelog.md](strona/version-changelog.md).
 
-## Licencja
+## License
 
-MIT — zobacz [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

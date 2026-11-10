@@ -1,6 +1,6 @@
 # shellcheck shell=bash disable=SC2034  # NAZWA i WERSJA czyta if-server.sh
 # Składnik: wykresy w Cockpit (install-myhome.sh, krok „Cockpit PCP”)
-NAZWA="Wykresy w Cockpit (PCP)"
+NAZWA="$(t 'Wykresy w Cockpit (PCP)')"
 WERSJA=1
 
 sprawdz() {
@@ -9,8 +9,8 @@ sprawdz() {
 }
 
 zainstaluj() {
-    run "Instalacja PCP" apt-get install -y cockpit-pcp pcp python3-pcp
+    run "$(t 'Instalacja PCP')" apt-get install -y cockpit-pcp pcp python3-pcp
     # „pcp” to stary skrypt SysV bez runlevels — włączamy tylko pmcd (opis w install-myhome.sh).
-    run "Włączenie pmcd" systemctl enable --now pmcd
-    run "Restart Cockpit" systemctl restart cockpit
+    run "$(t 'Włączenie pmcd')" systemctl enable --now pmcd
+    run "$(t 'Restart Cockpit')" systemctl restart cockpit
 }

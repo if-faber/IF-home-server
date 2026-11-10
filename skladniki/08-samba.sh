@@ -15,35 +15,35 @@ pytania() {
         return 0
     fi
     while true; do
-        pass1=$(whiptail --title "Udostępnianie plików w sieci (Samba)" \
-            --passwordbox "Ustaw hasło do udostępniania plików w sieci dla użytkownika '${TARGET_USER}'.
+        pass1=$(whiptail --title "$(t 'Udostępnianie plików w sieci (Samba)')" \
+            --passwordbox "$(t "Ustaw hasło do udostępniania plików w sieci dla użytkownika '%s'.
 
 Będzie ono potrzebne na innych komputerach/urządzeniach w domu, żeby połączyć się z udostępnionymi folderami.
 
-Program, który to obsługuje, nazywa się Samba — to standardowy sposób udostępniania folderów w sieci domowej (w Windows widoczny w Eksploratorze w zakładce Sieć)." \
+Program, który to obsługuje, nazywa się Samba — to standardowy sposób udostępniania folderów w sieci domowej (w Windows widoczny w Eksploratorze w zakładce Sieć)." "${TARGET_USER}")" \
             16 70 3>&1 1>&2 2>&3) || return 1
-        pass2=$(whiptail --title "Udostępnianie plików w sieci (Samba)" \
-            --passwordbox "Wpisz hasło jeszcze raz, żeby je potwierdzić." \
+        pass2=$(whiptail --title "$(t 'Udostępnianie plików w sieci (Samba)')" \
+            --passwordbox "$(t 'Wpisz hasło jeszcze raz, żeby je potwierdzić.')" \
             10 70 3>&1 1>&2 2>&3) || return 1
         if [ -n "$pass1" ] && [ "$pass1" = "$pass2" ]; then
             break
         fi
-        whiptail --title "Udostępnianie plików w sieci (Samba)" \
-            --msgbox "Hasła się różnią albo pole było puste — spróbuj ponownie." 8 60
+        whiptail --title "$(t 'Udostępnianie plików w sieci (Samba)')" \
+            --msgbox "$(t 'Hasła się różnią albo pole było puste — spróbuj ponownie.')" 8 60
     done
     printf 'SMB_PASSWORD=%q\n' "$pass1" >> "$ODPOWIEDZI"
 }
 
 zainstaluj() {
-    run "Instalacja Samby" apt-get install -y samba samba-common-bin
-    run "Włączenie usług smbd/nmbd" systemctl enable --now smbd nmbd
+    run "$(t 'Instalacja Samby')" apt-get install -y samba samba-common-bin
+    run "$(t 'Włączenie usług smbd/nmbd')" systemctl enable --now smbd nmbd
 
     if [ -n "${SMB_PASSWORD-}" ]; then
         # printf to polecenie wbudowane — hasło nie pojawia się na liście procesów.
         if printf '%s\n%s\n' "$SMB_PASSWORD" "$SMB_PASSWORD" | smbpasswd -a -s "$TARGET_USER" >>"$LOG_FILE" 2>&1; then
-            info "Hasło Samby ustawione"
+            info "$(t 'Hasło Samby ustawione')"
         else
-            warn "Nie udało się ustawić hasła Samby (szczegóły w dzienniku)"
+            warn "$(t 'Nie udało się ustawić hasła Samby (szczegóły w dzienniku)')"
             return 1
         fi
         unset SMB_PASSWORD

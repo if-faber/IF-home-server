@@ -8,7 +8,7 @@
 #   - strona postawiona z niepodmienionym {user} w ścieżkach → po pytaniu przenosi ją na
 #     właściwe miejsce (stare dane i stary stos zostają w kopii, nic nie kasujemy).
 # Wersja porównawcza = najnowsza wersja strony w chwili wydania serwera (USTALENIA home-server).
-NAZWA="IF-startpage (strona startowa)"
+NAZWA="$(t 'IF-startpage (strona startowa)')"
 WERSJA=8
 
 IFSTARTPAGE_TAG="v0.4.1"
@@ -46,17 +46,17 @@ ifstartpage_etykieta() {
 sprawdz() {
     if ! ifstartpage_kontener_jest; then
         [ -f "$(ifstartpage_compose)" ] || return 1
-        echo "działający kontener if-startpage"
+        printf '%s\n' "$(t 'działający kontener if-startpage')"
         return 0
     fi
     if ifstartpage_zle_sciezki; then
-        echo "strona zapisuje dane w złym folderze (/home/{user}) — przeniesienie"
+        printf '%s\n' "$(t 'strona zapisuje dane w złym folderze (/home/{user}) — przeniesienie')"
     fi
     if ifstartpage_starsza; then
-        echo "nowa wersja strony: ${IFSTARTPAGE_TAG} (jest $(ifstartpage_wersja))"
+        printf '%s\n' "$(t 'nowa wersja strony: %s (jest %s)' "${IFSTARTPAGE_TAG}" "$(ifstartpage_wersja)")"
     fi
     [ "$(docker inspect -f '{{.State.Running}}' if-startpage 2>/dev/null)" = "true" ] \
-        || echo "działający kontener if-startpage"
+        || printf '%s\n' "$(t 'działający kontener if-startpage')"
 }
 
 pytania() {
@@ -64,32 +64,32 @@ pytania() {
     if ifstartpage_kontener_jest; then
         # Przeniesienie strony tylko za zgodą — na ekranie, przed instalacją.
         if ifstartpage_zle_sciezki; then
-            whiptail --title "Strona startowa (IF-startpage)" --yes-button "Przenieś" --no-button "Anuluj" \
-                --yesno "Strona startowa zapisuje dane w złym folderze:
+            whiptail --title "$(t 'Strona startowa (IF-startpage)')" --yes-button "$(t 'Przenieś')" --no-button "$(t 'Anuluj')" \
+                --yesno "$(t 'Strona startowa zapisuje dane w złym folderze:
 
-$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app/config"}}{{.Source}}{{end}}{{end}}' if-startpage 2>/dev/null)
+%s
 
-Przenieść ją na właściwe miejsce (${USER_HOME}/docker/app-data/if-startpage)?
-Strona zniknie na chwilę. Stare dane i stary stos zostaną jako kopia — nic nie kasujemy." 17 74 || return 1
+Przenieść ją na właściwe miejsce (%s/docker/app-data/if-startpage)?
+Strona zniknie na chwilę. Stare dane i stary stos zostaną jako kopia — nic nie kasujemy.' "$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app/config"}}{{.Source}}{{end}}{{end}}' if-startpage 2>/dev/null)" "${USER_HOME}")" 17 74 || return 1
         fi
         return 0
     fi
     [ -f "$(ifstartpage_compose)" ] && return 0
     while true; do
-        pin1=$(whiptail --title "Strona startowa (IF-startpage)" \
-            --passwordbox "Ustaw PIN do Zaplecza strony startowej (4–8 cyfr).
+        pin1=$(whiptail --title "$(t 'Strona startowa (IF-startpage)')" \
+            --passwordbox "$(t 'Ustaw PIN do Zaplecza strony startowej (4–8 cyfr).
 
 Strona startowa to panel serwera w przeglądarce: http://<adres-serwera>
-PIN chroni ustawienia i zmiany. Później zmienisz go w Zapleczu → Ustawienia ogólne." \
+PIN chroni ustawienia i zmiany. Później zmienisz go w Zapleczu → Ustawienia ogólne.')" \
             14 70 3>&1 1>&2 2>&3) || return 1
-        pin2=$(whiptail --title "Strona startowa (IF-startpage)" \
-            --passwordbox "Wpisz PIN jeszcze raz, żeby go potwierdzić." \
+        pin2=$(whiptail --title "$(t 'Strona startowa (IF-startpage)')" \
+            --passwordbox "$(t 'Wpisz PIN jeszcze raz, żeby go potwierdzić.')" \
             10 70 3>&1 1>&2 2>&3) || return 1
         if [[ "$pin1" =~ ^[0-9]{4,8}$ ]] && [ "$pin1" = "$pin2" ]; then
             break
         fi
-        whiptail --title "Strona startowa (IF-startpage)" \
-            --msgbox "PIN musi mieć 4–8 cyfr i oba wpisy muszą być takie same — spróbuj ponownie." 8 70
+        whiptail --title "$(t 'Strona startowa (IF-startpage)')" \
+            --msgbox "$(t 'PIN musi mieć 4–8 cyfr i oba wpisy muszą być takie same — spróbuj ponownie.')" 8 70
     done
     printf 'IFSTARTPAGE_PIN=%q\n' "$pin1" >> "$ODPOWIEDZI"
 }
@@ -104,23 +104,23 @@ ifstartpage_przenies() {
     IFSTARTPAGE_PIN="$(sed -n 's/.*DASHBOARD_PIN=\([0-9][0-9]*\).*/\1/p' "$stary_compose" 2>/dev/null | head -n 1)"
     stamp="$(date +%Y%m%d-%H%M)"
 
-    info "Przenoszę stronę z ${stare_dane}"
-    run "Zatrzymanie strony startowej" docker compose -f "$stary_compose" down
+    info "$(t 'Przenoszę stronę z %s' "${stare_dane}")"
+    run "$(t 'Zatrzymanie strony startowej')" docker compose -f "$stary_compose" down
     for d in config backups icons; do
         mkdir -p "${data}/${d}"
         if [ -d "${stare_dane}/${d}" ] && [ -z "$(ls -A "${data}/${d}")" ]; then
             cp -a "${stare_dane}/${d}/." "${data}/${d}/"
         fi
     done
-    info "Dane strony skopiowane do ${data}"
+    info "$(t 'Dane strony skopiowane do %s' "${data}")"
     mkdir -p "${USER_HOME}/backups"
     if [ "$stary_folder" != "$dir" ] && [ -d "$stary_folder" ]; then
         mv "$stary_folder" "${USER_HOME}/backups/stos-$(basename "$stary_folder")-przed-przeniesieniem-${stamp}"
-        info "Stary stos odłożony do ${USER_HOME}/backups/stos-$(basename "$stary_folder")-przed-przeniesieniem-${stamp}"
+        info "$(t 'Stary stos odłożony do %s/backups/stos-%s-przed-przeniesieniem-%s' "${USER_HOME}" "$(basename "$stary_folder")" "${stamp}")"
     elif [ -f "$compose" ]; then
         mv "$compose" "${USER_HOME}/backups/if-startpage-compose-przed-przeniesieniem-${stamp}.yaml"
     fi
-    info "Stare dane zostały w ${stare_dane} — po sprawdzeniu strony można je usunąć"
+    info "$(t 'Stare dane zostały w %s — po sprawdzeniu strony można je usunąć' "${stare_dane}")"
 }
 
 zainstaluj() {
@@ -137,16 +137,16 @@ zainstaluj() {
         # Strona jest (także postawiona wcześniej w innym miejscu): tylko wersja, gdy starsza.
         if ifstartpage_starsza; then
             stary="$(ifstartpage_etykieta com.docker.compose.project.config_files)"
-            info "Strona startowa: $(ifstartpage_wersja) → ${IFSTARTPAGE_TAG}"
+            info "$(t 'Strona startowa: %s → %s' "$(ifstartpage_wersja)" "${IFSTARTPAGE_TAG}")"
             sed -i "s#\(image: *ghcr.io/if-faber/if-startpage:\)v[0-9.]*#\1${IFSTARTPAGE_TAG}#" "$stary"
-            run "Aktualizacja strony startowej" docker compose -f "$stary" up -d
+            run "$(t 'Aktualizacja strony startowej')" docker compose -f "$stary" up -d
         else
-            info "Strona startowa $(ifstartpage_wersja) — aktualna, zostawiam bez zmian"
+            info "$(t 'Strona startowa %s — aktualna, zostawiam bez zmian' "$(ifstartpage_wersja)")"
         fi
     else
         if [ ! -f "$compose" ]; then
             if ss -ltnH 'sport = :80' 2>/dev/null | grep -q .; then
-                warn "Port 80 jest zajęty przez inny program — strony startowej nie instaluję"
+                warn "$(t 'Port 80 jest zajęty przez inny program — strony startowej nie instaluję')"
                 return 1
             fi
             mkdir -p "$dir"
@@ -156,7 +156,7 @@ zainstaluj() {
                 -e "s#\(image: *ghcr.io/if-faber/if-startpage:\)v[0-9.]*#\1${IFSTARTPAGE_TAG}#" \
                 "$APP_DIR/strona/compose.yaml" > "$compose"
             chmod 600 "$compose"
-            info "Utworzono compose.yaml dla strony startowej ${IFSTARTPAGE_TAG}"
+            info "$(t 'Utworzono compose.yaml dla strony startowej %s' "${IFSTARTPAGE_TAG}")"
         fi
         mkdir -p "${data}/config" "${data}/backups" "${data}/icons"
         # Nazwa serwera jako „domena” strony startowej (odnośniki do Dockge, Cockpit, aplikacji).
@@ -164,12 +164,12 @@ zainstaluj() {
             printf '{\n  "defaultHost": "%s"\n}\n' "$(hostname -s)" > "${data}/config/dashboard.json"
         fi
         chown -R "${TARGET_USER}:${TARGET_USER}" "$dir" "$data"
-        run "Uruchomienie strony startowej" docker compose -f "$compose" up -d
+        run "$(t 'Uruchomienie strony startowej')" docker compose -f "$compose" up -d
     fi
 
     # Lista aktualizacji Debiana i wersja serwera od razu (zadanie z „Narzędzi dla IF-startpage”).
     if systemctl cat if-system-updates.service >/dev/null 2>&1; then
-        run "Lista aktualizacji Debiana dla strony" systemctl start --no-block if-system-updates.service
+        run "$(t 'Lista aktualizacji Debiana dla strony')" systemctl start --no-block if-system-updates.service
     fi
-    info "Strona startowa: http://$(hostname -s) (albo http://<adres IP serwera>)"
+    info "$(t 'Strona startowa: http://%s (albo http://<adres IP serwera>)' "$(hostname -s)")"
 }

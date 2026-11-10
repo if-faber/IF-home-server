@@ -1,6 +1,6 @@
 # shellcheck shell=bash disable=SC2034  # NAZWA i WERSJA czyta if-server.sh
 # Składnik: pakiety systemowe (install-myhome.sh, krok „Pakiety systemowe”, bez druku i ShellChecka)
-NAZWA="Pakiety systemowe"
+NAZWA="$(t 'Pakiety systemowe')"
 WERSJA=1
 
 sprawdz() {
@@ -10,8 +10,8 @@ sprawdz() {
 }
 
 zainstaluj() {
-    run "SSH i mDNS (.local)" apt-get install -y openssh-server avahi-daemon
-    run "Diagnostyka sprzętu (smartmontools, lm-sensors...)" apt-get install -y smartmontools lm-sensors sysstat htop
-    run "Protokoły sieciowe (NFS/CIFS)" apt-get install -y cifs-utils nfs-common
-    run "Python / Node.js" apt-get install -y nodejs python3-pip python3-venv
+    run "$(t 'SSH i mDNS (.local)')" apt-get install -y openssh-server avahi-daemon
+    run "$(t 'Diagnostyka sprzętu (smartmontools, lm-sensors...)')" apt-get install -y smartmontools lm-sensors sysstat htop
+    run "$(t 'Protokoły sieciowe (NFS/CIFS)')" apt-get install -y cifs-utils nfs-common
+    run "$(t 'Python / Node.js')" apt-get install -y nodejs python3-pip python3-venv
 }
