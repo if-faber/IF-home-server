@@ -1,8 +1,8 @@
 const dashboard = document.documentElement.dataset.dashboard;
 const dashboardConfig = {
   apiUrl: window.location.origin,
-  title: "Serwer domowy",
-  subtitle: "Usługi, narzędzia i administracja serwera",
+  title: t("page.header.default_title"),
+  subtitle: t("page.header.default_subtitle"),
   logo: "./images/logo.png",
   defaultHost: window.location.hostname || "localhost"
 };
@@ -38,6 +38,7 @@ function setStoredAdminPin(pin) {
     if (clean) {
       localStorage.setItem("myhome.admin.pin", clean);
       sessionStorage.setItem("homedash.admin.pin", clean);
+      localStorage.setItem("ifs.lastActivity", String(Date.now())); // zamek czasowy liczy od zalogowania
     } else {
       clearStoredAdminPin();
     }
@@ -54,7 +55,7 @@ function clearStoredAdminPin() {
 }
 
 const fontOptions = [
-  ["system", "Systemowa"],
+  ["system", t("page.appearance.font_system")],
   ["Inter", "Inter"],
   ["Poppins", "Poppins"],
   ["Montserrat", "Montserrat"],
@@ -119,7 +120,11 @@ async function request(url, options = {}) {
   } catch {
     data = {};
   }
-  if (!response.ok) throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(serverErrorText(data, "page.messages", data.message || data.error || `HTTP ${response.status}`));
+    error.code = data.code;
+    throw error;
+  }
   return data;
 }
 
@@ -161,7 +166,7 @@ async function reloadData() {
 function appShell() {
   document.querySelector("#app").innerHTML = `
     <div class="shell${state.sidebarHidden ? " sidebar-hidden" : ""}" id="shell">
-      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Pokaż lub ukryj menu" title="Pokaż lub ukryj menu">${uiIcon("menu", 22)}</button>
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="${escapeHtml(t("page.sidebar.menu_toggle"))}" title="${escapeHtml(t("page.sidebar.menu_toggle"))}">${uiIcon("menu", 22)}</button>
       <aside class="sidebar">
         <div class="brand">
           <div><strong>${escapeHtml(state.data.title)}</strong></div>
@@ -169,17 +174,18 @@ function appShell() {
         <nav id="navigation"></nav>
         <div class="sidebar-actions">
           <div class="sidebar-menu" id="sidebarMenu" role="menu" hidden>
-            <button type="button" role="menuitem" data-menu-action="appearance">${uiIcon("appearance", 18)} Wygląd (na żywo)</button>
-            <a href="./mods/admin/" role="menuitem">${uiIcon("admin", 18)} Zaplecze</a>
+            <button type="button" role="menuitem" data-menu-action="appearance">${uiIcon("appearance", 18)} ${escapeHtml(t("page.sidebar.menu_appearance"))}</button>
+            <a href="./mods/admin/" role="menuitem">${uiIcon("admin", 18)} ${escapeHtml(t("page.sidebar.menu_admin"))}</a>
             <div class="sidebar-menu-sep" role="separator"></div>
-            <button type="button" role="menuitem" data-menu-action="lock" id="sidebarMenuLock">${uiIcon("lock", 18)} <span>Zablokuj edycję</span></button>
+            <button type="button" role="menuitem" data-menu-action="lock" id="sidebarMenuLock" title="${escapeHtml(t("page.sidebar.menu_lock_title"))}">${uiIcon("lock", 18)} <span>${escapeHtml(t("page.sidebar.menu_lock"))}</span></button>
           </div>
           <div class="sidebar-tools">
-            <button type="button" class="sidebar-icon-btn" id="sidebarIconMode" title="Tryb dzień / noc" aria-label="Przełącz tryb dzień / noc">${modeToggleIcon()}</button>
-            <button type="button" class="sidebar-icon-btn" id="sidebarHelpButton" title="Informator — gdzie co jest" aria-label="Informator">${uiIcon("help", 20)}</button>
-            <button type="button" class="sidebar-icon-btn" id="sidebarMenuButton" title="Ustawienia" aria-label="Ustawienia" aria-haspopup="menu" aria-expanded="false">${uiIcon("settings", 20)}</button>
+            <button type="button" class="sidebar-icon-btn" id="sidebarIconMode" title="${escapeHtml(t("page.sidebar.mode_title"))}" aria-label="${escapeHtml(t("page.sidebar.mode_label"))}">${modeToggleIcon()}</button>
+            ${dashboardConfig.translatorEnabled ? `<a class="sidebar-icon-btn" id="sidebarTranslatorButton" href="./mods/admin/?tab=language" title="${escapeHtml(t("page.sidebar.translator_title"))}" aria-label="${escapeHtml(t("page.sidebar.translator_title"))}">${uiIcon("languages", 20)}</a>` : ""}
+            <button type="button" class="sidebar-icon-btn" id="sidebarHelpButton" title="${escapeHtml(t("page.sidebar.help_title"))}" aria-label="${escapeHtml(t("page.sidebar.help_label"))}">${uiIcon("help", 20)}</button>
+            <button type="button" class="sidebar-icon-btn" id="sidebarMenuButton" title="${escapeHtml(t("page.sidebar.settings"))}" aria-label="${escapeHtml(t("page.sidebar.settings"))}" aria-haspopup="menu" aria-expanded="false">${uiIcon("settings", 20)}</button>
           </div>
-          <div class="sidebar-footer">created by <strong>Idea Forge</strong></div>
+          <div class="sidebar-footer">${escapeHtml(t("page.sidebar.created_by"))} <strong>Idea Forge</strong></div>
         </div>
       </aside>
       <main class="main">
@@ -191,12 +197,12 @@ function appShell() {
             </div>
             <h1 id="viewTitle"></h1>
           </div>
-          <div class="header-stats" id="systemStatsWidget" aria-label="Statystyki systemu">
-            <div class="header-stat is-loading"><span>CPU</span><strong>--</strong></div>
-            <div class="header-stat is-loading"><span>RAM</span><strong>--</strong></div>
+          <div class="header-stats" id="systemStatsWidget" aria-label="${escapeHtml(t("page.header.stats_label"))}">
+            <div class="header-stat is-loading"><span>${escapeHtml(t("page.header.cpu"))}</span><strong>--</strong></div>
+            <div class="header-stat is-loading"><span>${escapeHtml(t("page.header.ram"))}</span><strong>--</strong></div>
           </div>
           <div class="toolbar-actions" id="toolbarActions"></div>
-          <button type="button" class="sidebar-icon-btn header-bell" id="sidebarIconAlerts" title="Powiadomienia i alerty" aria-label="Powiadomienia i alerty">${uiIcon("alerts", 20)}<span class="sidebar-alert-badge" id="sidebarAlertBadge" style="display:none;">0</span></button>
+          <button type="button" class="sidebar-icon-btn header-bell" id="sidebarIconAlerts" title="${escapeHtml(t("page.header.bell"))}" aria-label="${escapeHtml(t("page.header.bell"))}">${uiIcon("alerts", 20)}<span class="sidebar-alert-badge" id="sidebarAlertBadge" style="display:none;">0</span></button>
         </header>
         <div id="headerAlert" class="header-alert-box" style="display: none;"></div>
         <div id="headerBackup" class="header-alert-box" style="display: none;"></div>
@@ -206,200 +212,156 @@ function appShell() {
     <dialog id="linkDialog" class="wide-dialog">
       <form id="linkForm" class="modal-panel">
         <header class="modal-heading">
-          <div><span class="eyebrow">Zarządzanie</span><h2 id="linkDialogTitle">Nowy link</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
+          <div><span class="eyebrow">${escapeHtml(t("page.link_dialog.eyebrow"))}</span><h2 id="linkDialogTitle">${escapeHtml(t("page.link_dialog.title_new"))}</h2></div>
+          <button type="button" data-close aria-label="${escapeHtml(t("page.link_dialog.close"))}">×</button>
         </header>
         <div class="settings-grid">
-          <label>Sekcja<select id="linkSection"></select></label>
-          <label>Nazwa<input id="linkName" required></label>
-          <label style="grid-column: 1 / -1;">URL<input id="linkUrl" type="url" required placeholder="https://..."></label>
-          <label style="grid-column: 1 / -1;">Opis<input id="linkDescription"></label>
-          <label>Ikona<input id="linkIcon" placeholder="Plik z folderu icons (immich.png), ikona Lucide (printer), litera albo URL"></label>
-          <label>Otwieranie<select id="linkOpenMode"><option value="new-tab">Nowa karta</option><option value="iframe">W dashboardzie</option></select></label>
+          <label>${escapeHtml(t("page.link_dialog.section"))}<select id="linkSection"></select></label>
+          <label>${escapeHtml(t("page.link_dialog.name"))}<input id="linkName" required></label>
+          <label style="grid-column: 1 / -1;">${escapeHtml(t("page.link_dialog.url"))}<input id="linkUrl" type="url" required placeholder="https://..."></label>
+          <label style="grid-column: 1 / -1;">${escapeHtml(t("page.link_dialog.description"))}<input id="linkDescription"></label>
+          <label>${escapeHtml(t("page.link_dialog.icon"))}<input id="linkIcon" placeholder="${escapeHtml(t("page.link_dialog.icon_placeholder"))}"></label>
+          <label>${escapeHtml(t("page.link_dialog.open_mode"))}<select id="linkOpenMode"><option value="new-tab">${escapeHtml(t("page.link_dialog.open_new_tab"))}</option><option value="iframe">${escapeHtml(t("page.link_dialog.open_iframe"))}</option></select></label>
         </div>
-        <menu><button type="button" data-close>Anuluj</button><button class="primary">Zapisz link</button></menu>
+        <menu><button type="button" data-close>${escapeHtml(t("page.link_dialog.cancel"))}</button><button class="primary">${escapeHtml(t("page.link_dialog.save"))}</button></menu>
       </form>
     </dialog>
-    <dialog id="pinDialog">
-      <form id="pinForm" class="modal-panel">
-        <header class="modal-heading">
-          <div><span class="eyebrow">Autoryzacja</span><h2>Dostęp do Zaplecza</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
-        </header>
-        <label>Kod PIN<input id="adminPinInput" type="password" inputmode="numeric" autocomplete="current-password" required placeholder="Podaj PIN"></label>
-        <menu><button type="button" data-close>Anuluj</button><button class="primary">Odblokuj</button></menu>
-      </form>
-    </dialog>
-    <dialog id="settingsDialog" class="wide-dialog">
-      <form id="settingsForm" class="modal-panel">
-        <header class="modal-heading">
-          <div><span class="eyebrow">Zaplecze</span><h2>Ustawienia strony</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
-        </header>
-        <div class="settings-grid">
-          <label>Tytuł strony<input id="settingTitle" required></label>
-          <label>Opis<input id="settingSubtitle" required></label>
-          <label><span class="field-title">Adres strony startowej (nazwa serwera) ${infoTip("Jak domena strony startowej, np. iflab — otwierasz ją pod http://iflab. Tej nazwy używają odnośniki do Dockge, Cockpit i aplikacji. if-server wpisuje ją przy instalacji (nazwa serwera). Stronę możesz też otworzyć przez numer IP — działa tak samo.")}</span><input id="settingDefaultHost" required></label>
-          <label>Nowy PIN backendu<input id="settingNewPin" type="password" inputmode="numeric" placeholder="Puste = bez zmiany"></label>
-          <label>Upload logo<input id="settingLogo" type="file" accept="image/png,image/jpeg,image/webp"></label>
-        </div>
-        <p class="settings-note">Statystyki systemu pobierane są lokalnie z helpera.</p>
-        <menu><button type="button" data-close>Anuluj</button><button class="primary">Zapisz ustawienia</button></menu>
-      </form>
-    </dialog>
+    ${pinDialogHtml()}
     <dialog id="appearanceDialog" class="wide-dialog preview-dialog">
       <form id="appearanceForm" class="modal-panel">
         <header class="modal-heading">
-          <div><span class="eyebrow">Zaplecze</span><h2>Wygląd i Style CSS</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
+          <div><span class="eyebrow">${escapeHtml(t("page.appearance.eyebrow"))}</span><h2>${escapeHtml(t("page.appearance.title"))}</h2></div>
+          <button type="button" data-close aria-label="${escapeHtml(t("page.appearance.close"))}">×</button>
         </header>
         <div class="appearance-mode-bar">
-          <label>Edytujesz wygląd dla trybu
+          <label>${escapeHtml(t("page.appearance.mode_label"))}
             <select id="themeEditMode">
-              <option value="d">Dzień (custom-d.css)</option>
-              <option value="n">Noc (custom-n.css)</option>
+              <option value="d">${escapeHtml(t("page.appearance.mode_day"))}</option>
+              <option value="n">${escapeHtml(t("page.appearance.mode_night"))}</option>
             </select>
           </label>
-          <p>Zmiany widać od razu. „Zapisz wygląd” zapisuje plik wybranego trybu. „Anuluj” odrzuca niezapisane zmiany.</p>
+          <p>${escapeHtml(t("page.appearance.mode_hint"))}</p>
         </div>
         <div class="appearance-sections">
           <!-- 1. Ogólne i tło -->
           <section class="appearance-section">
-            <div class="appearance-section-title">${uiIcon("appearance", 16)} Ogólne i Tło</div>
+            <div class="appearance-section-title">${uiIcon("appearance", 16)} ${escapeHtml(t("page.appearance.group_general"))}</div>
             <div class="appearance-section-grid">
-              <label>Akcent<input id="themeAccent" type="color"></label>
-              <label><span class="field-title">Kolor nagłówków (Akcent 2) ${infoTip("Nagłówki na kafelkach i w okienkach: tytuły okien, tytuły kart (np. na stronie Status serwera). Napisy leżące wprost na tle strony mają własne kontrolki w części „Nagłówek i napisy na tle”.")}</span><input id="themeAccentAlt" type="color"></label>
-              <label>Tło strony<input id="themeBg" type="color"></label>
-              <label>Kolor motywu<input id="themeSurfaceColor" type="color"></label>
-              <label>Kolor tekstu<input id="themeTextColor" type="color"></label>
-              <label>Kolor tekstu pomocniczego<input id="themeMutedColor" type="color"></label>
-              <label>Tekst na przyciskach w kolorze akcentu<input id="themeOnAccentColor" type="color"></label>
-              <label><span class="field-title">Kolor tekstu w polach ${infoTip("Tekst wpisywany w polach formularzy i listach wyboru (np. nazwa linku, adres, wyszukiwarka). Podpowiedź w pustym polu ma jaśniejszą wersję tego koloru.")}</span><input id="themeInputTextColor" type="color"></label>
-              <label>Obraz tła<select id="themeBackgroundImage"><option value="">Wyłączony</option><option value="default">./images/background.jpg</option><option value="custom">Własny obraz</option></select></label>
-              <label>Upload tła<input id="themeBackgroundUpload" type="file" accept="image/png,image/jpeg,image/webp"></label>
-              <label>Przyciemnienie tła<input id="themeBackgroundDim" type="range" min="0" max="85" step="1"><span></span></label>
-              <label>Blur obrazu<input id="themeBackgroundBlur" type="range" min="0" max="40" step="1"><span></span></label>
-              <label>Widoczność obrazu<input id="themeBackgroundOpacity" type="range" min="0" max="100" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.accent"))}<input id="themeAccent" type="color"></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.accent_alt"))} ${infoTip(t("page.appearance.accent_alt_tip"))}</span><input id="themeAccentAlt" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.bg"))}<input id="themeBg" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.surface"))}<input id="themeSurfaceColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.text"))}<input id="themeTextColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.muted"))}<input id="themeMutedColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.on_accent"))}<input id="themeOnAccentColor" type="color"></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.input_text"))} ${infoTip(t("page.appearance.input_text_tip"))}</span><input id="themeInputTextColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.bg_image"))}<select id="themeBackgroundImage"><option value="">${escapeHtml(t("page.appearance.bg_image_off"))}</option><option value="default">./images/background.jpg</option><option value="custom">${escapeHtml(t("page.appearance.bg_image_custom"))}</option></select></label>
+              <label>${escapeHtml(t("page.appearance.bg_upload"))}<input id="themeBackgroundUpload" type="file" accept="image/png,image/jpeg,image/webp"></label>
+              <label>${escapeHtml(t("page.appearance.bg_dim"))}<input id="themeBackgroundDim" type="range" min="0" max="85" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.bg_blur"))}<input id="themeBackgroundBlur" type="range" min="0" max="40" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.bg_opacity"))}<input id="themeBackgroundOpacity" type="range" min="0" max="100" step="1"><span></span></label>
             </div>
           </section>
 
           <!-- 2. Header / Nagłówek -->
           <section class="appearance-section">
-            <div class="appearance-section-title">${uiIcon("tag", 16)} Nagłówek i napisy na tle ${infoTip("Napisy, które leżą wprost na tle strony (obraz lub kolor tła), a nie na kafelku. Każdy ma własny kolor, bo tło i kafelki mogą być bardzo różne.")}</div>
+            <div class="appearance-section-title">${uiIcon("tag", 16)} ${escapeHtml(t("page.appearance.group_header"))} ${infoTip(t("page.appearance.group_header_tip"))}</div>
             <div class="appearance-section-grid">
-              <label>Kolor nazwy serwisu<input id="themeTitleColor" type="color"></label>
-              <label>Wielkość nazwy serwisu<input id="themeTitleSize" type="range" min="16" max="52" step="1"><span></span></label>
-              <label>Cień nazwy serwisu<input id="themeTitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
-              <label>Kolor sloganu<input id="themeSubtitleColor" type="color"></label>
-              <label>Wielkość sloganu<input id="themeSubtitleSize" type="range" min="11" max="28" step="1"><span></span></label>
-              <label>Cień sloganu<input id="themeSubtitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
-              <label>Rozmiar logo (do 260px)<input id="themeLogoSize" type="range" min="32" max="260" step="2"><span></span></label>
-              <label><span class="field-title">Kolor tytułu strony ${infoTip("Duży napis nad treścią, np. „Status serwera”.")}</span><input id="themePageTitleColor" type="color"></label>
-              <label>Wielkość tytułu strony<input id="themePageTitleSize" type="range" min="16" max="52" step="1"><span></span></label>
-              <label>Cień tytułu strony<input id="themePageTitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
-              <label><span class="field-title">Kolor tytułów sekcji ${infoTip("Napisy nad grupami kafelków na stronach, np. ADMINISTRACJA SERWERA.")}</span><input id="themeSectionTitleColor" type="color"></label>
-              <label>Wielkość tytułów sekcji<input id="themeSectionTitleSize" type="range" min="10" max="28" step="1"><span></span></label>
-              <label>Cień tytułów sekcji<input id="themeSectionTitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.site_name_color"))}<input id="themeTitleColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.site_name_size"))}<input id="themeTitleSize" type="range" min="16" max="52" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.site_name_shadow"))}<input id="themeTitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.slogan_color"))}<input id="themeSubtitleColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.slogan_size"))}<input id="themeSubtitleSize" type="range" min="11" max="28" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.slogan_shadow"))}<input id="themeSubtitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.logo_size"))}<input id="themeLogoSize" type="range" min="32" max="260" step="2"><span></span></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.page_title_color"))} ${infoTip(t("page.appearance.page_title_color_tip"))}</span><input id="themePageTitleColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.page_title_size"))}<input id="themePageTitleSize" type="range" min="16" max="52" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.page_title_shadow"))}<input id="themePageTitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.section_title_color"))} ${infoTip(t("page.appearance.section_title_color_tip"))}</span><input id="themeSectionTitleColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.section_title_size"))}<input id="themeSectionTitleSize" type="range" min="10" max="28" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.section_title_shadow"))}<input id="themeSectionTitleShadowBlur" type="range" min="0" max="30" step="1"><span></span></label>
             </div>
           </section>
 
           <!-- 3. Sidebar / Pasek boczny -->
           <section class="appearance-section">
-            <div class="appearance-section-title">${uiIcon("tabs", 16)} Pasek boczny (Sidebar)</div>
+            <div class="appearance-section-title">${uiIcon("tabs", 16)} ${escapeHtml(t("page.appearance.group_sidebar"))}</div>
             <div class="appearance-section-grid">
-              <label>Kolor tła menu<input id="themeSidebarPanelColor" type="color"></label>
-              <label>Glass / Krycie menu<input id="themeSidebarPanelAlpha" type="range" min="0" max="95" step="1"><span></span></label>
-              <label>Szerokość menu<input id="themeSidebarWidth" type="range" min="240" max="360" step="5"><span></span></label>
-              <label><span class="field-title">Kolor ikon menu ${infoTip("Ikony pozycji w menu, przycisk ☰ i ikony w stopce menu (☀️/🌙, ⚙️). Aktywna pozycja i najechanie mają własne kolory.")}</span><input id="themeSidebarToggleColor" type="color"></label>
-              <label><span class="field-title">Wielkość ikon menu ${infoTip("Wielkość ikon pozycji w menu.")}</span><input id="themeSidebarToggleSize" type="range" min="16" max="44" step="1"><span></span></label>
-              <label>Czcionka menu<select id="themeFontMenu">${renderFontOptions()}</select></label>
-              <label><span class="field-title">Glass paska z nazwą ${infoTip("Przezroczyste tło pod każdą pozycją menu. 0% = bez tła. Najechanie i aktywna pozycja mają to samo szkło, tylko w swoim kolorze.")}</span><input id="themeLolliGlass" type="range" min="0" max="95" step="1"><span></span></label>
-              <label><span class="field-title">Blur paska z nazwą ${infoTip("Rozmycie tego, co jest pod pozycją menu (efekt szkła). Działa razem z „Glass paska z nazwą”.")}</span><input id="themeLolliBlur" type="range" min="0" max="30" step="1"><span></span></label>
-              <label><span class="field-title">Menu: kolor napisów ${infoTip("Nazwy pozycji w menu (Home, strony, Status…).")}</span><input id="themeLolliTextColor" type="color"></label>
-              <label><span class="field-title">Menu: ikona po najechaniu ${infoTip("Kolor ikony pozycji menu, gdy najedziesz na nią myszą. Pozycja dostaje też delikatne tło w tym kolorze.")}</span><input id="themeLolliHoverColor" type="color"></label>
-              <label><span class="field-title">Aktywna pozycja: tło ${infoTip("Zaokrąglone, półprzezroczyste tło pozycji strony, na której jesteś.")}</span><input id="themeLolliActiveBg" type="color"></label>
-              <label><span class="field-title">Aktywna pozycja: ikona ${infoTip("Kolor ikony pozycji strony, na której jesteś.")}</span><input id="themeLolliActiveIcon" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.sidebar_bg"))}<input id="themeSidebarPanelColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.sidebar_alpha"))}<input id="themeSidebarPanelAlpha" type="range" min="0" max="95" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.sidebar_width"))}<input id="themeSidebarWidth" type="range" min="240" max="360" step="5"><span></span></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.sidebar_icon_color"))} ${infoTip(t("page.appearance.sidebar_icon_color_tip"))}</span><input id="themeSidebarToggleColor" type="color"></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.sidebar_icon_size"))} ${infoTip(t("page.appearance.sidebar_icon_size_tip"))}</span><input id="themeSidebarToggleSize" type="range" min="16" max="44" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.font_menu"))}<select id="themeFontMenu">${renderFontOptions()}</select></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.lolli_glass"))} ${infoTip(t("page.appearance.lolli_glass_tip"))}</span><input id="themeLolliGlass" type="range" min="0" max="95" step="1"><span></span></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.lolli_blur"))} ${infoTip(t("page.appearance.lolli_blur_tip"))}</span><input id="themeLolliBlur" type="range" min="0" max="30" step="1"><span></span></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.lolli_text"))} ${infoTip(t("page.appearance.lolli_text_tip"))}</span><input id="themeLolliTextColor" type="color"></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.lolli_hover"))} ${infoTip(t("page.appearance.lolli_hover_tip"))}</span><input id="themeLolliHoverColor" type="color"></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.lolli_active_bg"))} ${infoTip(t("page.appearance.lolli_active_bg_tip"))}</span><input id="themeLolliActiveBg" type="color"></label>
+              <label><span class="field-title">${escapeHtml(t("page.appearance.lolli_active_icon"))} ${infoTip(t("page.appearance.lolli_active_icon_tip"))}</span><input id="themeLolliActiveIcon" type="color"></label>
             </div>
           </section>
 
           <!-- 4. Kafelki i Strona -->
           <section class="appearance-section">
-            <div class="appearance-section-title">${uiIcon("page", 16)} Kafelki i Zawartość Strony</div>
+            <div class="appearance-section-title">${uiIcon("page", 16)} ${escapeHtml(t("page.appearance.group_tiles"))}</div>
             <div class="appearance-section-grid">
-              <label>Kolor kafelków linków<input id="themePanelColor" type="color"></label>
-              <label>Glass kafelków linków<input id="themePanelAlpha" type="range" min="5" max="85" step="1"><span></span></label>
-              <label>Wysokość kafelków<input id="themeTileHeight" type="range" min="108" max="180" step="2"><span></span></label>
-              <label>Kolor kart statusu/admin<input id="themeAdminPanelColor" type="color"></label>
-              <label>Krycie kart statusu/admin<input id="themeAdminPanelAlpha" type="range" min="5" max="90" step="1"><span></span></label>
-              <label>Obramowanie kart<input id="themeBorderAlpha" type="range" min="0" max="35" step="1"><span></span></label>
-              <label>Zaokrąglenie kart<input id="themeCardRadius" type="range" min="8" max="34" step="1"><span></span></label>
-              <label>Odstęp kart<input id="themeCardGap" type="range" min="8" max="28" step="1"><span></span></label>
-              <label>Blur glass<input id="themeGlassBlur" type="range" min="0" max="60" step="1"><span></span></label>
-              <label>Saturacja glass<input id="themeGlassSaturation" type="range" min="60" max="260" step="1"><span></span></label>
-              <label>Czcionka kafelków<select id="themeFontCard">${renderFontOptions()}</select></label>
-              <label>Czcionka opisów<select id="themeFontDescription">${renderFontOptions()}</select></label>
+              <label>${escapeHtml(t("page.appearance.tile_color"))}<input id="themePanelColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.tile_glass"))}<input id="themePanelAlpha" type="range" min="5" max="85" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.tile_height"))}<input id="themeTileHeight" type="range" min="108" max="180" step="2"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.card_color"))}<input id="themeAdminPanelColor" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.card_alpha"))}<input id="themeAdminPanelAlpha" type="range" min="5" max="90" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.card_border"))}<input id="themeBorderAlpha" type="range" min="0" max="35" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.card_radius"))}<input id="themeCardRadius" type="range" min="8" max="34" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.card_gap"))}<input id="themeCardGap" type="range" min="8" max="28" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.glass_blur"))}<input id="themeGlassBlur" type="range" min="0" max="60" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.glass_saturation"))}<input id="themeGlassSaturation" type="range" min="60" max="260" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.font_card"))}<select id="themeFontCard">${renderFontOptions()}</select></label>
+              <label>${escapeHtml(t("page.appearance.font_description"))}<select id="themeFontDescription">${renderFontOptions()}</select></label>
             </div>
           </section>
 
           <!-- 5. Okna modalne (Modale) -->
           <section class="appearance-section">
-            <div class="appearance-section-title">${uiIcon("window", 16)} Okna Modalne (Modale)</div>
+            <div class="appearance-section-title">${uiIcon("window", 16)} ${escapeHtml(t("page.appearance.group_modals"))}</div>
             <div class="appearance-section-grid">
-              <label>Kolor modali<input id="themeModalBg" type="color"></label>
-              <label>Krycie modali<input id="themeModalAlpha" type="range" min="10" max="100" step="1"><span></span></label>
-              <label>Blur modali<input id="themeModalGlassBlur" type="range" min="0" max="60" step="1"><span></span></label>
-              <label>Zaokrąglenie modali<input id="themeModalRadius" type="range" min="8" max="36" step="1"><span></span></label>
-              <label>Przyciemnienie tła modali<input id="themeModalBackdropAlpha" type="range" min="0" max="95" step="1"><span></span></label>
-              <label>Blur przyciemnienia tła<input id="themeModalBackdropBlur" type="range" min="0" max="25" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.modal_color"))}<input id="themeModalBg" type="color"></label>
+              <label>${escapeHtml(t("page.appearance.modal_alpha"))}<input id="themeModalAlpha" type="range" min="10" max="100" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.modal_blur"))}<input id="themeModalGlassBlur" type="range" min="0" max="60" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.modal_radius"))}<input id="themeModalRadius" type="range" min="8" max="36" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.modal_backdrop"))}<input id="themeModalBackdropAlpha" type="range" min="0" max="95" step="1"><span></span></label>
+              <label>${escapeHtml(t("page.appearance.modal_backdrop_blur"))}<input id="themeModalBackdropBlur" type="range" min="0" max="25" step="1"><span></span></label>
             </div>
           </section>
         </div>
-        <menu><button id="resetAppearance" type="button">Wygląd startowy trybu</button><button type="button" data-close>Anuluj</button><button class="primary">Zapisz wygląd</button></menu>
+        <menu><button id="resetAppearance" type="button">${escapeHtml(t("page.appearance.reset"))}</button><button type="button" data-close>${escapeHtml(t("page.appearance.cancel"))}</button><button class="primary">${escapeHtml(t("page.appearance.save"))}</button></menu>
       </form>
     </dialog>
     <dialog id="alertsQuickModal" class="wide-dialog">
       <div class="modal-panel">
         <header class="modal-heading">
-          <div><span class="eyebrow">Diagnostyka</span><h2>${uiIcon("alerts", 22)} Szybki Podgląd Alertów</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
+          <div><span class="eyebrow">${escapeHtml(t("page.alerts_preview.eyebrow"))}</span><h2>${uiIcon("alerts", 22)} ${escapeHtml(t("page.alerts_preview.title"))}</h2></div>
+          <button type="button" data-close aria-label="${escapeHtml(t("page.alerts_preview.close"))}">×</button>
         </header>
         <div id="quickAlertsContent" style="display: grid; gap: 10px; max-height: 50vh; overflow-y: auto; padding-right: 4px;">
-          <div class="empty">Pobieranie stanu alertów...</div>
+          <div class="empty">${escapeHtml(t("page.alerts_preview.loading_state"))}</div>
         </div>
         <menu>
-          <button type="button" data-close>Zamknij</button>
-          <button type="button" id="btnQuickRefresh" class="button">${uiIcon("refresh", 16)} Odśwież</button>
-          <a href="./mods/admin/?tab=alerts" class="button primary" style="display: inline-flex; align-items: center; text-decoration: none;">Centrum Alertów →</a>
+          <button type="button" data-close>${escapeHtml(t("page.alerts_preview.close"))}</button>
+          <button type="button" id="btnQuickRefresh" class="button">${uiIcon("refresh", 16)} ${escapeHtml(t("page.alerts_preview.refresh"))}</button>
+          <a href="./mods/admin/?tab=alerts" class="button primary" style="display: inline-flex; align-items: center; text-decoration: none;">${escapeHtml(t("page.alerts_preview.open_center"))}</a>
         </menu>
-      </div>
-    </dialog>
-    <dialog id="helperDialog" class="wide-dialog">
-      <div class="modal-panel">
-        <header class="modal-heading">
-          <div><span class="eyebrow">Pomoc</span><h2>Helper i komendy</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
-        </header>
-        <div class="command-list">
-          <article><strong>Status helpera</strong><code>sudo systemctl status www-helper.service</code></article>
-          <article><strong>Restart helpera</strong><code>sudo systemctl restart www-helper.service</code></article>
-          <article><strong>Logi helpera</strong><code>sudo journalctl -u www-helper.service -n 50 --no-pager</code></article>
-          <article><strong>Status strony nginx</strong><code>docker ps --filter name=homepage</code></article>
-          <article><strong>Restart strony nginx</strong><code>docker restart homepage</code></article>
-          <article><strong>Pliki strony</strong><code>ls -l /home/darek/www/index.html /home/darek/www/app.js /home/darek/www/styles.css</code></article>
-          <article><strong>Uprawnienia strony</strong><code>chmod 644 /home/darek/www/index.html /home/darek/www/app.js /home/darek/www/styles.css</code></article>
-          <article><strong>Port helpera</strong><code>sudo ss -lptn 'sport = :3010'</code></article>
-        </div>
       </div>
     </dialog>
     <dialog id="sectionAddDialog">
       <div class="modal-panel">
         <header class="modal-heading">
-          <div><span class="eyebrow">Strona: <span id="sectionAddPage"></span></span><h2>Dodaj sekcję</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
+          <div><span class="eyebrow">${escapeHtml(t("page.section_dialog.page_label"))} <span id="sectionAddPage"></span></span><h2>${escapeHtml(t("page.section_dialog.title"))}</h2></div>
+          <button type="button" data-close aria-label="${escapeHtml(t("page.section_dialog.close"))}">×</button>
         </header>
         <form id="sectionAddForm" class="inline-form">
-          <label>Nazwa sekcji<input id="sectionAddName" required maxlength="60" placeholder="np. Usługi serwera"></label>
-          <button class="primary" type="submit">Dodaj</button>
+          <label>${escapeHtml(t("page.section_dialog.name"))}<input id="sectionAddName" required maxlength="60" placeholder="${escapeHtml(t("page.section_dialog.name_placeholder"))}"></label>
+          <button class="primary" type="submit">${escapeHtml(t("page.section_dialog.add"))}</button>
         </form>
       </div>
     </dialog>
@@ -413,7 +375,6 @@ function bindShell() {
   document.querySelector("#menuToggle")?.addEventListener("click", toggleSidebar);
   document.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", () => button.closest("dialog")?.close()));
   document.querySelector("#pinForm")?.addEventListener("submit", unlockAdminPanel);
-  document.querySelector("#settingsForm")?.addEventListener("submit", saveDashboardSettings);
   document.querySelector("#appearanceForm")?.addEventListener("submit", saveThemeSettings);
   const onAppearanceEdit = (event) => {
     if (!event.target || event.target.id === "themeEditMode" || event.target.id === "themeBackgroundUpload") return;
@@ -433,12 +394,12 @@ function bindShell() {
       state.appearanceDirty = true;
       previewTheme();
     } catch (err) {
-      showToast("Nie udało się odczytać pliku tła.");
+      showToast(t("page.messages.bg_read_failed"));
     }
   });
   document.querySelector("#themeEditMode")?.addEventListener("change", async (event) => {
     const mode = event.target.value;
-    if (state.appearanceDirty && !(await ifConfirm("Masz niezapisane zmiany. Przełączyć tryb i je odrzucić?", { okLabel: "Przełącz", danger: true }))) {
+    if (state.appearanceDirty && !(await ifConfirm(t("page.appearance.switch_confirm"), { okLabel: t("page.appearance.switch_ok"), danger: true }))) {
       event.target.value = currentMode();
       return;
     }
@@ -479,7 +440,7 @@ function bindShell() {
     menu.hidden = !opening;
     menuButton.setAttribute("aria-expanded", String(opening));
     const lock = document.querySelector("#sidebarMenuLock");
-    if (lock) lock.innerHTML = getStoredAdminPin() ? `${uiIcon("lock", 18)} <span>Zablokuj edycję</span>` : `${uiIcon("unlock", 18)} <span>Odblokuj</span>`;
+    if (lock) lock.innerHTML = getStoredAdminPin() ? `${uiIcon("lock", 18)} <span>${escapeHtml(t("page.sidebar.menu_lock"))}</span>` : `${uiIcon("unlock", 18)} <span>${escapeHtml(t("page.sidebar.menu_unlock"))}</span>`;
   });
   document.addEventListener("click", (event) => {
     if (menu && !menu.hidden && !menu.contains(event.target)) closeMenu();
@@ -494,7 +455,7 @@ function bindShell() {
     } else if (action === "lock") {
       if (getStoredAdminPin()) {
         clearStoredAdminPin();
-        showToast("Edycja zablokowana.");
+        showToast(t("page.messages.locked"));
         if (state.view === "admin") {
           state.view = "links";
           render();
@@ -541,7 +502,7 @@ function render() {
 // Stałe strony serwera — pod kreską w menu. Procesy (Top) są w Statusie serwera, alerty — w dzwonku,
 // tester portów — w Zapleczu → Moduły (Darek 9.11.2026: zakładki Top, Alerty i Narzędzia usunięte).
 const SERVER_VIEWS = [
-  { view: "status", label: "Status serwera", icon: "status" }
+  { view: "status", label: t("page.sidebar.nav_server_status"), icon: "status" }
 ];
 
 function sectionsOfPage(pageId) {
@@ -646,7 +607,7 @@ function openSectionAddDialog() {
 async function saveQuickSection(event) {
   event.preventDefault();
   const name = document.querySelector("#sectionAddName").value.trim();
-  if (!name) return showToast("Podaj nazwę sekcji.");
+  if (!name) return showToast(t("page.messages.section_name_required"));
   try {
     await request(`${dashboardConfig.apiUrl}/api/services/section`, {
       method: "POST",
@@ -655,7 +616,7 @@ async function saveQuickSection(event) {
     document.querySelector("#sectionAddDialog").close();
     await reloadData();
     render();
-    showToast(`Dodano sekcję „${name}”.`);
+    showToast(t("page.messages.section_added", { name }));
   } catch (error) {
     showToast(error.message);
   }
@@ -671,19 +632,19 @@ function renderLinks() {
   const sections = sectionsOfPage(page.id);
   document.querySelector("#viewTitle").textContent = page.name;
   document.querySelector("#toolbarActions").innerHTML = `
-    <input id="search" type="search" value="${escapeHtml(state.query)}" placeholder="Szukaj linku...">
+    <input id="search" type="search" value="${escapeHtml(state.query)}" placeholder="${escapeHtml(t("page.header.search_placeholder"))}">
   `;
   document.querySelector("#content").innerHTML = `
     <div class="page-sections" id="pageSections"></div>
     <div class="content-actions">
       <div class="content-menu-wrap">
         <div class="sidebar-menu content-menu" id="contentMenu" role="menu" hidden>
-          ${sections.length ? `<button type="button" role="menuitem" data-content-action="link">${uiIcon("plus", 18)} Dodaj link</button>` : ""}
-          <button type="button" role="menuitem" data-content-action="section">${uiIcon("plus", 18)} Dodaj sekcję</button>
+          ${sections.length ? `<button type="button" role="menuitem" data-content-action="link">${uiIcon("plus", 18)} ${escapeHtml(t("page.links.menu_add_link"))}</button>` : ""}
+          <button type="button" role="menuitem" data-content-action="section">${uiIcon("plus", 18)} ${escapeHtml(t("page.links.menu_add_section"))}</button>
           <div class="sidebar-menu-sep" role="separator"></div>
-          <a href="./mods/admin/?tab=homepage" role="menuitem" data-content-action="manage">${uiIcon("admin", 18)} Zarządzanie</a>
+          <a href="./mods/admin/?tab=homepage" role="menuitem" data-content-action="manage">${uiIcon("admin", 18)} ${escapeHtml(t("page.links.menu_manage"))}</a>
         </div>
-        <button type="button" class="sidebar-icon-btn content-menu-btn" id="contentMenuButton" title="Sekcje i linki" aria-label="Sekcje i linki" aria-haspopup="menu" aria-expanded="false">${uiIcon("settings", 22)}</button>
+        <button type="button" class="sidebar-icon-btn content-menu-btn" id="contentMenuButton" title="${escapeHtml(t("page.links.menu_button"))}" aria-label="${escapeHtml(t("page.links.menu_button"))}" aria-haspopup="menu" aria-expanded="false">${uiIcon("settings", 22)}</button>
       </div>
     </div>
   `;
@@ -712,7 +673,7 @@ function buildLinkCard(link) {
       <span class="link-copy"><strong>${escapeHtml(link.name)}</strong><span>${escapeHtml(link.description || link.url)}</span></span>
       <span class="open-mark">${uiIcon("external", 14)}</span>
     </button>
-    <div class="card-actions"><button data-edit type="button" aria-label="Edytuj link" title="Edytuj">${uiIcon("edit", 15)}</button><button data-delete type="button" aria-label="Usuń link" title="Usuń">${uiIcon("trash", 15)}</button></div>
+    <div class="card-actions"><button data-edit type="button" aria-label="${escapeHtml(t("page.links.edit_label"))}" title="${escapeHtml(t("page.links.edit_title"))}">${uiIcon("edit", 15)}</button><button data-delete type="button" aria-label="${escapeHtml(t("page.links.delete_label"))}" title="${escapeHtml(t("page.links.delete_title"))}">${uiIcon("trash", 15)}</button></div>
   `;
   card.querySelector(".link-main").addEventListener("click", () => openLink(link));
   card.querySelector("[data-edit]").addEventListener("click", () => withAdminPin(() => openLinkDialog(link)));
@@ -728,7 +689,8 @@ function renderLinkCards() {
   if (!target) return;
   const sections = sectionsOfPage(state.activePageId);
   if (!sections.length) {
-    target.innerHTML = '<div class="empty"><p style="margin:0">Na tej stronie nie ma jeszcze kafelków.<br>Kliknij <strong>+ Dodaj sekcję</strong> na dole, a potem dodaj w niej pierwsze linki.</p></div>';
+    const hint = escapeHtml(t("page.links.empty_hint")).replace("{button}", `<strong>${escapeHtml(t("page.links.empty_button"))}</strong>`);
+    target.innerHTML = `<div class="empty"><p style="margin:0">${escapeHtml(t("page.links.empty_page"))}<br>${hint}</p></div>`;
     return;
   }
   const query = state.query.trim().toLowerCase();
@@ -742,11 +704,11 @@ function renderLinkCards() {
     block.innerHTML = `<h2 class="page-section-title">${section.icon ? uiIcon(section.icon, 16) : ""}${escapeHtml(section.name)}</h2><div class="link-grid"></div>`;
     const grid = block.querySelector(".link-grid");
     links.forEach((link) => grid.appendChild(buildLinkCard(link)));
-    if (!links.length) grid.innerHTML = '<div class="empty empty-small">Pusta sekcja — dodaj link przyciskiem na dole.</div>';
+    if (!links.length) grid.innerHTML = `<div class="empty empty-small">${escapeHtml(t("page.links.empty_section"))}</div>`;
     shown += links.length;
     target.appendChild(block);
   });
-  if (query && !shown) target.innerHTML = '<div class="empty">Nic nie znaleziono.</div>';
+  if (query && !shown) target.innerHTML = `<div class="empty">${escapeHtml(t("page.links.no_results"))}</div>`;
 }
 
 function openLink(link) {
@@ -756,8 +718,8 @@ function openLink(link) {
       <div class="frame-panel">
         <div>
           <strong>${escapeHtml(link.name)}</strong>
-          <button id="closeFrame" type="button">Zamknij</button>
-          <a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">Otwórz w karcie ${uiIcon("external", 14)}</a>
+          <button id="closeFrame" type="button">${escapeHtml(t("page.links.frame_close"))}</button>
+          <a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(t("page.links.frame_open_tab"))} ${uiIcon("external", 14)}</a>
         </div>
         <iframe src="${escapeHtml(link.url)}" title="${escapeHtml(link.name)}"></iframe>
       </div>
@@ -778,7 +740,7 @@ function openLinkDialog(link = null) {
   const pageSections = sectionsOfPage(state.activePageId);
   sectionSelect.innerHTML = pageSections.map((section) => `<option value="${section.id}">${escapeHtml(section.name)}</option>`).join("");
   sectionSelect.value = link?.sectionId || state.activeSectionId || pageSections[0]?.id || "";
-  document.querySelector("#linkDialogTitle").textContent = link ? "Edytuj link" : "Nowy link";
+  document.querySelector("#linkDialogTitle").textContent = t(link ? "page.link_dialog.title_edit" : "page.link_dialog.title_new");
   document.querySelector("#linkName").value = link?.name || "";
   document.querySelector("#linkUrl").value = link?.url || "";
   document.querySelector("#linkDescription").value = link?.description || "";
@@ -811,19 +773,19 @@ async function saveLink(event) {
     await reloadData();
     state.activeSectionId = sectionId;
     render();
-    showToast(isEditing ? "Link zaktualizowany." : "Link dodany.");
+    showToast(isEditing ? t("page.messages.link_updated") : t("page.messages.link_added"));
   } catch (error) {
     showToast(error.message);
   }
 }
 
 async function deleteLink(link) {
-  if (!(await ifConfirm(`Usunąć link „${link.name}”?`, { okLabel: "Usuń", danger: true }))) return;
+  if (!(await ifConfirm(t("page.links.delete_confirm", { name: link.name }), { okLabel: t("page.links.delete_ok"), danger: true }))) return;
   try {
     await request(`${dashboardConfig.apiUrl}/api/services/link/${link.id}`, { method: "DELETE" });
     await reloadData();
     render();
-    showToast("Link usunięty.");
+    showToast(t("page.messages.link_deleted"));
   } catch (error) {
     showToast(error.message);
   }
@@ -855,9 +817,8 @@ async function unlockAdminPanel(event) {
     });
     setStoredAdminPin(pin);
     document.querySelector("#pinDialog").close();
-    showToast("Edycja odblokowana.");
-    if (state.pendingAdminPanel === "settings") openSettingsPanel();
-    else if (state.pendingAdminPanel === "appearance") openAppearancePanel();
+    showToast(t("page.messages.unlocked"));
+    if (state.pendingAdminPanel === "appearance") openAppearancePanel();
     else if (state.pendingAdminPanel === "action" && typeof state.pendingAction === "function") {
       const action = state.pendingAction;
       state.pendingAction = null;
@@ -868,46 +829,7 @@ async function unlockAdminPanel(event) {
       render();
     }
   } catch (error) {
-    showToast("Błędny kod PIN.");
-  }
-}
-
-function openSettingsPanel() {
-  document.querySelector("#settingTitle").value = dashboardConfig.title;
-  document.querySelector("#settingSubtitle").value = dashboardConfig.subtitle;
-  document.querySelector("#settingDefaultHost").value = dashboardConfig.defaultHost;
-  document.querySelector("#settingNewPin").value = "";
-  document.querySelector("#settingLogo").value = "";
-  document.querySelector("#settingsDialog").showModal();
-}
-
-async function saveDashboardSettings(event) {
-  event.preventDefault();
-  const logoFile = document.querySelector("#settingLogo").files[0];
-  const logoData = logoFile ? await readFileAsDataUrl(logoFile) : null;
-  const payload = {
-    title: document.querySelector("#settingTitle").value.trim(),
-    subtitle: document.querySelector("#settingSubtitle").value.trim(),
-    defaultHost: document.querySelector("#settingDefaultHost").value.trim(),
-    newPin: document.querySelector("#settingNewPin").value.trim(),
-    logoData
-  };
-  try {
-    const data = await request(`${dashboardConfig.apiUrl}/api/dashboard/settings`, {
-      method: "PUT",
-      body: JSON.stringify(payload)
-    });
-    applyDashboardSettings(data.settings);
-    document.querySelector("#settingsDialog").close();
-    // Po zmianie PIN-u wylogowanie — przy następnej edycji strona zapyta o nowy PIN.
-    if (payload.newPin) {
-      clearStoredAdminPin();
-      showToast("PIN zmieniony. Przy następnej edycji wpisz nowy PIN.");
-      return;
-    }
-    showToast("Ustawienia zapisane.");
-  } catch (error) {
-    showToast(error.message);
+    showToast(t("page.messages.wrong_pin"));
   }
 }
 
@@ -924,6 +846,8 @@ function applyDashboardSettings(settings) {
   if (settings.subtitle) dashboardConfig.subtitle = settings.subtitle;
   if (settings.defaultHost) dashboardConfig.defaultHost = settings.defaultHost;
   if (settings.logo) dashboardConfig.logo = settings.logo;
+  // Moduł „Tłumacz” włączony → ikonka tłumacza (Lucide „languages”) na pasku (otwiera kartę w Zapleczu, z PIN-em).
+  dashboardConfig.translatorEnabled = settings.translatorEnabled === true;
   if (state.data) {
     state.data.title = dashboardConfig.title;
     state.data.subtitle = dashboardConfig.subtitle;
@@ -1278,7 +1202,7 @@ async function saveThemeSettings(event) {
   if (theme.backgroundImage === "custom") theme.backgroundUrl = state.currentBackgroundUrl || "";
   const vars = themeToVars(theme);
   if (theme.backgroundImage === "custom" && !theme.backgroundUrl && !state.pendingBackground) {
-    showToast("Wybierz plik obrazu albo inny obraz tła.");
+    showToast(t("page.messages.bg_choose"));
     return;
   }
   try {
@@ -1289,7 +1213,7 @@ async function saveThemeSettings(event) {
     if (mode === "n") state.legacyTheme = null;
     reloadModeCss(mode);
     document.querySelector("#appearanceDialog").close();
-    showToast(mode === "d" ? "Zapisano wygląd dnia (custom-d.css)." : "Zapisano wygląd nocy (custom-n.css).");
+    showToast(mode === "d" ? t("page.messages.saved_day") : t("page.messages.saved_night"));
   } catch (error) {
     showToast(error.message);
   }
@@ -1297,8 +1221,7 @@ async function saveThemeSettings(event) {
 
 async function resetThemeSettings() {
   const mode = document.querySelector("#themeEditMode")?.value === "d" ? "d" : "n";
-  const label = mode === "d" ? "dnia" : "nocy";
-  if (!(await ifConfirm(`Przywrócić wygląd startowy ${label}? Twoje zmiany dla tego trybu zostaną usunięte.`, { okLabel: "Przywróć", danger: true }))) return;
+  if (!(await ifConfirm(t(mode === "d" ? "page.appearance.reset_confirm_day" : "page.appearance.reset_confirm_night"), { okLabel: t("page.appearance.reset_ok"), danger: true }))) return;
   try {
     await request(`${dashboardConfig.apiUrl}/api/dashboard/custom-css`, {
       method: "PUT",
@@ -1307,7 +1230,7 @@ async function resetThemeSettings() {
     if (mode === "n") state.legacyTheme = null;
     reloadModeCss(mode);
     document.querySelector("#appearanceDialog").close();
-    showToast(`Przywrócono wygląd startowy ${label}.`);
+    showToast(mode === "d" ? t("page.messages.reset_day") : t("page.messages.reset_night"));
   } catch (error) {
     showToast(error.message);
   }
@@ -1363,21 +1286,21 @@ function stopStatusTopDiagnostics() {
 
 function renderServerStatus() {
   stopStatusTopDiagnostics();
-  document.querySelector("#viewTitle").textContent = "Status serwera";
+  document.querySelector("#viewTitle").textContent = t("page.header.title_server_status");
   document.querySelector("#toolbarActions").innerHTML = `
-    <button type="button" class="primary" id="btnRefreshServerStatus">Odśwież</button>
+    <button type="button" class="primary" id="btnRefreshServerStatus">${escapeHtml(t("page.header.refresh"))}</button>
   `;
   document.querySelector("#content").innerHTML = `
     <section class="admin-card system-stats-card">
       <div class="panel-heading">
-        <div><span class="eyebrow">Monitoring</span><h2>Statystyki systemu</h2></div>
-        <div class="panel-heading-actions"><span id="systemStatsUpdated">Oczekiwanie</span></div>
+        <div><span class="eyebrow">${escapeHtml(t("page.server_status.eyebrow_stats"))}</span><h2>${escapeHtml(t("page.server_status.stats_title"))}</h2></div>
+        <div class="panel-heading-actions"><span id="systemStatsUpdated">${escapeHtml(t("page.server_status.waiting"))}</span></div>
       </div>
-      <div class="cockpit-stats" id="systemStats"><div class="empty">Pobieranie danych…</div></div>
+      <div class="cockpit-stats" id="systemStats"><div class="empty">${escapeHtml(t("page.server_status.loading"))}</div></div>
     </section>
     <section class="admin-card status-updates-card">
-      <div class="panel-heading"><div><span class="eyebrow">Informacja</span><h2>Aktualizacje</h2></div></div>
-      <div class="status-updates" id="statusUpdates"><div class="empty">Sprawdzanie…</div></div>
+      <div class="panel-heading"><div><span class="eyebrow">${escapeHtml(t("page.server_status.updates_eyebrow"))}</span><h2>${escapeHtml(t("page.server_status.updates_title"))}</h2></div></div>
+      <div class="status-updates" id="statusUpdates"><div class="empty">${escapeHtml(t("page.server_status.checking"))}</div></div>
     </section>
     <section class="admin-card status-top-card"><div id="topPageMount"></div></section>
   `;
@@ -1415,49 +1338,48 @@ async function loadStatusUpdates() {
   ]);
   if (!document.querySelector("#statusUpdates")) return;
   const host = dashboardConfig.defaultHost || window.location.hostname;
-  const plural = (n, one, few, many) => (n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
 
   // Debian (pakiety systemowe) — instalacja w Cockpit.
   let osTile;
-  const cockpit = `<a class="status-update-link" href="https://${escapeHtml(host)}:9090" target="_blank" rel="noopener">Otwórz Cockpit ${uiIcon("external", 13)}</a>`;
+  const cockpit = `<a class="status-update-link" href="https://${escapeHtml(host)}:9090" target="_blank" rel="noopener">${escapeHtml(t("page.server_status.open_cockpit"))} ${uiIcon("external", 13)}</a>`;
   if (os.status !== "fulfilled" || !os.value.available) {
-    osTile = statusUpdateTile("terminal", "Debian", "info", "Serwer nie podaje jeszcze listy aktualizacji.", cockpit);
+    osTile = statusUpdateTile("terminal", "Debian", "info", escapeHtml(t("page.server_status.debian_unavailable")), cockpit);
   } else {
     const n = (os.value.packages || []).length;
     const sec = os.value.securityCount || 0;
-    const stale = os.value.stale ? " Lista ma ponad 2 dni." : "";
+    const stale = os.value.stale ? ` ${t("page.server_status.debian_stale")}` : "";
     osTile = n
-      ? statusUpdateTile("terminal", "Debian", "warn", `${n} ${plural(n, "pakiet", "pakiety", "pakietów")} do aktualizacji${sec ? `, w tym ${sec} bezpieczeństwa` : ""}.${stale}`, cockpit)
-      : statusUpdateTile("terminal", "Debian", "ok", `Pakiety systemowe są aktualne.${stale}`, cockpit);
+      ? statusUpdateTile("terminal", "Debian", "warn", escapeHtml((sec ? tn("page.server_status.debian_packages_security", n, { security: sec }) : tn("page.server_status.debian_packages", n)) + stale), cockpit)
+      : statusUpdateTile("terminal", "Debian", "ok", escapeHtml(t("page.server_status.debian_ok") + stale), cockpit);
   }
 
   // Program serwera — aktualizuje się w terminalu: sudo if-server → aktualizuj.
   let serverTile;
   const s = server.status === "fulfilled" ? server.value : {};
   if (!s.installed || !s.latest) {
-    serverTile = statusUpdateTile("monitor", "IF-home-server", "info", `Zainstalowana: ${escapeHtml(s.installed || "nieznana")}${s.latest ? `, najnowsza: ${escapeHtml(s.latest)}` : ""}.`, "");
+    serverTile = statusUpdateTile("monitor", "IF-home-server", "info", escapeHtml(t(s.latest ? "page.server_status.server_info_latest" : "page.server_status.server_info", { installed: s.installed || t("page.server_status.server_unknown"), latest: s.latest })), "");
   } else if (s.upToDate) {
-    serverTile = statusUpdateTile("monitor", "IF-home-server", "ok", `Wersja ${escapeHtml(s.installed)} — aktualna.`, "");
+    serverTile = statusUpdateTile("monitor", "IF-home-server", "ok", escapeHtml(t("page.server_status.server_ok", { version: s.installed })), "");
   } else {
-    serverTile = statusUpdateTile("monitor", "IF-home-server", "warn", `Jest nowsza wersja: ${escapeHtml(s.latest)} (masz ${escapeHtml(s.installed)}).`,
-      `<span class="status-update-link is-hint">W terminalu serwera: <code>sudo if-server</code> → aktualizuj</span>`);
+    serverTile = statusUpdateTile("monitor", "IF-home-server", "warn", escapeHtml(t("page.server_status.server_newer", { latest: s.latest, installed: s.installed })),
+      `<span class="status-update-link is-hint">${escapeHtml(t("page.server_status.server_hint")).replace("{command}", "<code>sudo if-server</code>")}</span>`);
   }
 
   // Aplikacje (kontenery) — aktualizowanie w Zapleczu.
   let appsTile;
-  const appsLink = `<a class="status-update-link" href="./mods/admin/?tab=apps">Przejdź do Aktualizacji aplikacji →</a>`;
+  const appsLink = `<a class="status-update-link" href="./mods/admin/?tab=apps">${escapeHtml(t("page.server_status.apps_link"))}</a>`;
   if (apps.status !== "fulfilled") {
-    appsTile = statusUpdateTile("container", "Aplikacje", "info", "Nie udało się sprawdzić wersji aplikacji.", appsLink);
+    appsTile = statusUpdateTile("container", t("page.server_status.apps_title"), "info", escapeHtml(t("page.server_status.apps_failed")), appsLink);
   } else {
     const list = (apps.value.versions || []).filter((v) => !v.local);
     const patch = list.filter((v) => v.latestPatch).length;
     const major = list.filter((v) => v.latestMajor).length;
     const parts = [];
-    if (patch) parts.push(`${patch} ${plural(patch, "poprawka", "poprawki", "poprawek")}`);
-    if (major) parts.push(`${major} ${plural(major, "większa zmiana", "większe zmiany", "większych zmian")}`);
+    if (patch) parts.push(tn("page.server_status.apps_patch", patch));
+    if (major) parts.push(tn("page.server_status.apps_major", major));
     appsTile = parts.length
-      ? statusUpdateTile("container", "Aplikacje", "warn", `Nowsze wersje: ${parts.join(", ")}.`, appsLink)
-      : statusUpdateTile("container", "Aplikacje", "ok", `Wszystkie aplikacje są aktualne (${list.length}).`, appsLink);
+      ? statusUpdateTile("container", t("page.server_status.apps_title"), "warn", escapeHtml(t("page.server_status.apps_newer", { list: parts.join(", ") })), appsLink)
+      : statusUpdateTile("container", t("page.server_status.apps_title"), "ok", escapeHtml(t("page.server_status.apps_ok", { n: list.length })), appsLink);
   }
 
   box.innerHTML = osTile + serverTile + appsTile;
@@ -1480,8 +1402,8 @@ async function refreshBackupBar(soon = false) {
           <div class="incident-bar backup">
             <span class="incident-bar-icon">${uiIcon("save", 22)}</span>
             <span class="incident-bar-text">
-              <strong>${s.kind === "przywracanie" ? "Przywracanie" : "Kopia zapasowa"}: ${s.percent}%</strong>
-              <span>${escapeHtml(s.step || "")}</span>
+              <strong>${escapeHtml(t(s.kind === "przywracanie" ? "page.header.restore_running" : "page.header.backup_running", { percent: s.percent }))}</strong>
+              <span>${escapeHtml(backupStepText(s, "page.header"))}</span>
               <span class="backup-progress"><span style="width:${s.percent}%"></span></span>
             </span>
           </div>`;
@@ -1540,17 +1462,19 @@ async function loadAlertsSummary() {
       const visible = barAlerts.filter((a) => !dismissed.includes(keyOf(a)));
       if (visible.length) {
         const isCritical = visible.some((a) => a.severity === "critical");
-        const names = visible.map((a) => a.type === "temperature" ? `${a.resource} (${a.message.split(" — ")[0]})` : (a.resource || a.title));
+        const names = visible.map((a) => a.type === "temperature"
+          ? `${serverSensorName(a.sensor, a.resource, "page.header")} (${a.vars?.temp != null ? IF_FORMAT.temp(a.vars.temp) : a.message.split(" — ")[0]})`
+          : (a.resource || a.title));
         headerAlert.innerHTML = `
           <div class="incident-bar ${isCritical ? "critical" : "warning"}">
             <span class="incident-bar-icon">${uiIcon(isCritical ? "siren" : "warning", 24)}</span>
             <span class="incident-bar-text">
-              <strong>${isCritical ? "Alarm — wykryto awarię" : "Uwaga — podwyższona temperatura"}</strong>
+              <strong>${escapeHtml(t(isCritical ? "page.header.alert_critical" : "page.header.alert_warning"))}</strong>
               <span>${escapeHtml(names.join(", "))}</span>
             </span>
-            <a href="./mods/admin/?tab=alerts" class="incident-bar-btn" title="Otwórz szczegóły w Centrum alertów">Szczegóły →</a>
+            <a href="./mods/admin/?tab=alerts" class="incident-bar-btn" title="${escapeHtml(t("page.header.alert_details_title"))}">${escapeHtml(t("page.header.alert_details"))}</a>
             <span class="incident-bar-spacer"></span>
-            <button type="button" class="incident-bar-close" id="headerAlertClose" title="Zamknij pasek (alert zostaje w dzwonku)" aria-label="Zamknij pasek">${uiIcon("close", 18)}</button>
+            <button type="button" class="incident-bar-close" id="headerAlertClose" title="${escapeHtml(t("page.header.alert_close_title"))}" aria-label="${escapeHtml(t("page.header.alert_close_label"))}">${uiIcon("close", 18)}</button>
           </div>
         `;
         headerAlert.querySelector("#headerAlertClose").addEventListener("click", () => {
@@ -1584,7 +1508,7 @@ function renderQuickAlertsContent() {
 async function renderAlertsInto(selector) {
   const container = document.querySelector(selector);
   if (!container) return;
-  container.innerHTML = '<div class="empty">Pobieranie alertów...</div>';
+  container.innerHTML = `<div class="empty">${escapeHtml(t("page.alerts_preview.loading"))}</div>`;
   try {
     const data = await request(`${dashboardConfig.apiUrl}/api/alerts/summary`);
     state.alertsData = data;
@@ -1593,8 +1517,8 @@ async function renderAlertsInto(selector) {
       container.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 24px; text-align:center; background: rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.25); border-radius:14px;">
           <span style="margin-bottom:8px; color:#34d399;">${uiIcon("ok", 34)}</span>
-          <strong style="color:#34d399; font-size:15px;">Wszystkie usługi i kontenery działają stabilnie.</strong>
-          <span style="color:var(--muted); font-size:12px; margin-top:4px;">Brak aktywnych awarii w Homelabie.</span>
+          <strong style="color:#34d399; font-size:15px;">${escapeHtml(t("page.alerts_preview.all_ok"))}</strong>
+          <span style="color:var(--muted); font-size:12px; margin-top:4px;">${escapeHtml(t("page.alerts_preview.no_failures"))}</span>
         </div>
       `;
       return;
@@ -1607,15 +1531,15 @@ async function renderAlertsInto(selector) {
         <div class="incident-bar ${level}">
           <span class="incident-bar-icon">${uiIcon(isCritical ? "siren" : isInfo ? "package" : "warning", 24)}</span>
           <span class="incident-bar-text">
-            <strong>${escapeHtml(a.title)}</strong>
-            <span>${escapeHtml(a.message)}</span>
+            <strong>${escapeHtml(serverAlertText(a, "page.alerts_preview").title)}</strong>
+            <span>${escapeHtml(serverAlertText(a, "page.alerts_preview").message)}</span>
           </span>
-          <span class="incident-bar-tag">${isCritical ? "Awaria" : isInfo ? "Informacja" : "Ostrzeżenie"}</span>
+          <span class="incident-bar-tag">${escapeHtml(t(isCritical ? "page.alerts_preview.tag_critical" : isInfo ? "page.alerts_preview.tag_info" : "page.alerts_preview.tag_warning"))}</span>
         </div>
       `;
     }).join("");
   } catch (err) {
-    container.innerHTML = `<div class="empty" style="color:var(--danger);">Błąd pobierania alertów: ${escapeHtml(err.message)}</div>`;
+    container.innerHTML = `<div class="empty" style="color:var(--danger);">${escapeHtml(t("page.alerts_preview.error", { message: err.message }))}</div>`;
   }
 }
 
@@ -1631,20 +1555,22 @@ async function loadSystemStats() {
     widget.dataset.status = "online";
     const updated = data.updated ? new Date(data.updated) : null;
     const updatedText = updated && !Number.isNaN(updated.getTime())
-      ? `Akt. ${updated.toLocaleTimeString("pl-PL")}`
-      : "Połączono";
-    widget.title = updatedText;
+      ? t("page.server_status.updated", { time: IF_FORMAT.time(updated) })
+      : t("page.server_status.connected");
+    widget.title = updated && !Number.isNaN(updated.getTime())
+      ? t("page.header.stats_updated", { time: IF_FORMAT.time(updated) })
+      : t("page.header.stats_connected");
     if (container) container.innerHTML = renderSystemStats(data);
     if (updatedLabel) updatedLabel.textContent = updatedText;
   } catch (error) {
     widget.dataset.status = "error";
     widget.title = error.message;
     widget.innerHTML = `
-      <div class="header-stat is-error"><span>CPU</span><strong>--</strong></div>
-      <div class="header-stat is-error"><span>RAM</span><strong>--</strong></div>
+      <div class="header-stat is-error"><span>${escapeHtml(t("page.header.cpu"))}</span><strong>--</strong></div>
+      <div class="header-stat is-error"><span>${escapeHtml(t("page.header.ram"))}</span><strong>--</strong></div>
     `;
     if (container) container.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
-    if (updatedLabel) updatedLabel.textContent = "Brak danych";
+    if (updatedLabel) updatedLabel.textContent = t("page.server_status.no_data");
   }
 }
 
@@ -1659,8 +1585,8 @@ function renderHeaderStats(data) {
     return "";
   };
   return `
-    <div class="header-stat${level(cpuUsage, data.thresholds?.cpu)}"><span>CPU</span><strong>${percentLabel(cpuUsage)}</strong></div>
-    <div class="header-stat${level(memoryPercent, data.thresholds?.ram)}"><span>RAM</span><strong>${percentLabel(memoryPercent)}</strong></div>
+    <div class="header-stat${level(cpuUsage, data.thresholds?.cpu)}"><span>${escapeHtml(t("page.header.cpu"))}</span><strong>${percentLabel(cpuUsage)}</strong></div>
+    <div class="header-stat${level(memoryPercent, data.thresholds?.ram)}"><span>${escapeHtml(t("page.header.ram"))}</span><strong>${percentLabel(memoryPercent)}</strong></div>
   `;
 }
 
@@ -1672,26 +1598,26 @@ function renderSystemStats(data) {
 
   return `
     <article class="cockpit-stat-card">
-      <header><h3>Procesor</h3><strong>${data.cpu?.temperature == null ? "—" : `${Math.round(data.cpu.temperature)} °C`}</strong></header>
-      <div class="stat-line"><strong>${escapeHtml(String(data.cpu?.count ?? "—"))} procesory</strong><span>użycie: ${percentLabel(cpuUsage)}</span></div>
+      <header><h3>${escapeHtml(t("page.server_status.cpu_title"))}</h3><strong>${IF_FORMAT.temp(data.cpu?.temperature)}</strong></header>
+      <div class="stat-line"><strong>${data.cpu?.count == null ? "—" : escapeHtml(tn("page.server_status.cpu_count", data.cpu.count))}</strong><span>${escapeHtml(t("page.server_status.cpu_usage", { value: percentLabel(cpuUsage) }))}</span></div>
       ${renderProgress(cpuUsage)}
-      <p><strong>Obciążenie</strong> 1 minuta: ${numberLabel(data.cpu?.load1)}, 5 minut: ${numberLabel(data.cpu?.load5)}, 15 minut: ${numberLabel(data.cpu?.load15)}</p>
+      <p><strong>${escapeHtml(t("page.server_status.load"))}</strong> ${escapeHtml(t("page.server_status.load_values", { m1: numberLabel(data.cpu?.load1), m5: numberLabel(data.cpu?.load5), m15: numberLabel(data.cpu?.load15) }))}</p>
     </article>
     <article class="cockpit-stat-card">
-      <header><h3>Pamięć</h3></header>
-      <div class="stat-line"><strong>RAM</strong><span>${bytesLabel(data.memory?.available)} dostępne</span></div>
+      <header><h3>${escapeHtml(t("page.server_status.memory_title"))}</h3></header>
+      <div class="stat-line"><strong>${escapeHtml(t("page.server_status.ram"))}</strong><span>${escapeHtml(t("page.server_status.available", { size: bytesLabel(data.memory?.available) }))}</span></div>
       ${renderProgress(memoryPercent)}
-      <div class="stat-line"><strong>Partycja wymiany</strong><span>${bytesLabel(data.swap?.available)} dostępne</span></div>
+      <div class="stat-line"><strong>${escapeHtml(t("page.server_status.swap"))}</strong><span>${escapeHtml(t("page.server_status.available", { size: bytesLabel(data.swap?.available) }))}</span></div>
       ${renderProgress(swapPercent)}
     </article>
     <article class="cockpit-stat-card">
-      <header><h3>Dyski</h3></header>
+      <header><h3>${escapeHtml(t("page.server_status.disks_title"))}</h3></header>
       ${disks.length ? disks.map((disk) => `
         <div class="disk-row">
-          <div class="stat-line"><strong>${escapeHtml(disk.mount)}</strong><span>${bytesLabel(disk.available)} wolne</span></div>
+          <div class="stat-line"><strong>${escapeHtml(serverMountName(disk, "page.server_status"))}</strong><span>${escapeHtml(t("page.server_status.free", { size: bytesLabel(disk.available) }))}</span></div>
           ${renderProgress(disk.percent)}
         </div>
-      `).join("") : `<div class="empty">Brak danych dysków.</div>`}
+      `).join("") : `<div class="empty">${escapeHtml(t("page.server_status.no_disks"))}</div>`}
     </article>
   `;
 }
@@ -1702,7 +1628,7 @@ function renderProgress(value) {
 }
 
 function numberLabel(value) {
-  return value == null || Number.isNaN(Number(value)) ? "—" : Number(value).toFixed(2);
+  return IF_FORMAT.number(value, 2);
 }
 
 function bytesLabel(value) {
@@ -1715,18 +1641,11 @@ function bytesLabel(value) {
     size /= 1024;
     unit += 1;
   }
-  return `${size >= 10 || unit < 2 ? Math.round(size) : size.toFixed(1).replace(".", ",")} ${units[unit]}`;
+  return `${IF_FORMAT.number(size, size >= 10 || unit < 2 ? 0 : 1)} ${units[unit]}`;
 }
 
 function percentLabel(value) {
   return value == null ? "—" : `${Math.round(Number(value))}%`;
-}
-
-function statusLabel(value) {
-  const status = String(value || "unknown").toLowerCase();
-  if (["up", "online", "ok", "healthy"].includes(status)) return "Online";
-  if (["down", "offline", "error"].includes(status)) return "Offline";
-  return value || "Nieznany";
 }
 
 function syncSystemStatsPolling() {
@@ -1759,10 +1678,11 @@ async function init() {
     appShell();
     await loadThemeSettings();
     loadAlertsSummary();
+    initIdleLock((minutes) => showToast(t("page.messages.auto_logout", { minutes })));
   } catch (error) {
     document.querySelector("#app").innerHTML = `
       <div class="startup-error">
-        <strong>Nie udało się uruchomić strony startowej</strong>
+        <strong>${escapeHtml(t("page.messages.startup_failed"))}</strong>
         <span>${escapeHtml(error.message)}</span>
       </div>
     `;
@@ -1774,36 +1694,40 @@ init();
 // ─── Informator: skrócona obsługa — najważniejsze rzeczy, gdzie co jest (Darek 9.11.2026) ───
 function openInformator() {
   const host = escapeHtml(dashboardConfig.defaultHost || window.location.hostname);
-  const admin = (tab, text) => `<a href="./mods/admin/?tab=${tab}">${text}</a>`;
+  const T = (key) => escapeHtml(t(`page.informator.${key}`));
+  const admin = (tab, key) => `<a href="./mods/admin/?tab=${tab}"><strong>${T(`${key}_name`)}</strong></a> ${T(`${key}_text`)}`;
+  const apps = T("apps_text")
+    .replace("{updates}", `<em>${T("apps_updates")}</em>`)
+    .replace("{installer}", `<em>${T("apps_installer")}</em>`);
   const dialog = document.createElement("dialog");
   dialog.className = "if-confirm informator";
   dialog.innerHTML = `
     <div class="modal-panel">
-      <header class="modal-heading"><div><h2>${uiIcon("help", 22)} Informator</h2></div>
-        <button type="button" data-close aria-label="Zamknij">×</button></header>
+      <header class="modal-heading"><div><h2>${uiIcon("help", 22)} ${T("title")}</h2></div>
+        <button type="button" data-close aria-label="${T("close")}">×</button></header>
       <div class="informator-body">
-        <h3>Strona główna</h3>
+        <h3>${T("h_home")}</h3>
         <ul>
-          <li><strong>Menu ⚙️</strong> (w pasku bocznym i na dole strony) — dodaj link, dodaj sekcję, wygląd, Zablokuj / Odblokuj edycję.</li>
-          <li><strong>Strony w menu</strong> (Home, Ulubione…) — na nich sekcje z kafelkami linków.</li>
-          <li><a href="#" data-informator-status><strong>Status serwera</strong></a> — statystyki, aktualizacje (Debian, IF-home-server, aplikacje) i procesy (Top).</li>
-          <li><strong>Dzwonek</strong> w nagłówku — alerty. Pasek na górze strony — awarie, przekroczone temperatury, postęp kopii.</li>
-          <li><strong>☀️/🌙</strong> — tryb dzień / noc.</li>
+          <li><strong>${T("menu_name")}</strong> ${T("menu_text")}</li>
+          <li><strong>${T("pages_name")}</strong> ${T("pages_text")}</li>
+          <li><a href="#" data-informator-status><strong>${T("status_name")}</strong></a> ${T("status_text")}</li>
+          <li><strong>${T("bell_name")}</strong> ${T("bell_text")}</li>
+          <li><strong>${T("mode_name")}</strong> ${T("mode_text")}</li>
         </ul>
-        <h3>Zaplecze (PIN)</h3>
+        <h3>${T("h_admin")}</h3>
         <ul>
-          <li>${admin("apps", "<strong>Aplikacje</strong>")} — <em>Aktualizacje</em> (przycisk „Aktualizuj”: kopia, nowa wersja, sprawdzenie) i <em>Instalator</em> (nowa aplikacja z compose).</li>
-          <li>${admin("backup", "<strong>Kopia zapasowa</strong>")} — dysk na kopie, jak często, ile kopii, kopia teraz, przywracanie.</li>
-          <li>${admin("alerts", "<strong>Centrum Alertów</strong>")} — kontenery, logi, progi temperatur i obciążenia.</li>
-          <li>${admin("homepage", "<strong>Strony i sekcje</strong>")} — nazwy, kolejność, usuwanie stron, sekcji i linków.</li>
-          <li>${admin("modules", "<strong>Moduły</strong>")} — Kiosk, Tester portów.</li>
-          <li>${admin("helper", "<strong>Ustawienia ogólne</strong>")} — tytuł strony, adres strony startowej (nazwa serwera), PIN, logo.</li>
+          <li><a href="./mods/admin/?tab=apps"><strong>${T("apps_name")}</strong></a> ${apps}</li>
+          <li>${admin("backup", "backup")}</li>
+          <li>${admin("alerts", "alerts")}</li>
+          <li>${admin("homepage", "homepage")}</li>
+          <li>${admin("modules", "modules")}</li>
+          <li>${admin("helper", "general")}</li>
         </ul>
-        <h3>Poza stroną</h3>
+        <h3>${T("h_outside")}</h3>
         <ul>
-          <li><a href="http://${host}:5001" target="_blank" rel="noopener"><strong>Dockge</strong></a> (port 5001) — stosy aplikacji (compose), uruchamianie, logi.</li>
-          <li><a href="https://${host}:9090" target="_blank" rel="noopener"><strong>Cockpit</strong></a> (port 9090) — system: aktualizacje Debiana, dyski, udostępnianie plików.</li>
-          <li><strong>Terminal serwera:</strong> <code>sudo if-server</code> — aktualizacja programu serwera, Upgrade (naprawa i nowe składniki), Stan serwera.</li>
+          <li><a href="http://${host}:5001" target="_blank" rel="noopener"><strong>Dockge</strong></a> ${T("dockge_text")}</li>
+          <li><a href="https://${host}:9090" target="_blank" rel="noopener"><strong>Cockpit</strong></a> ${T("cockpit_text")}</li>
+          <li><strong>${T("terminal_name")}</strong> ${T("terminal_text").replace("{command}", "<code>sudo if-server</code>")}</li>
         </ul>
       </div>
     </div>`;

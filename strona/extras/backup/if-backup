@@ -57,7 +57,15 @@ WZOR_KOPII = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{4}(-\d+)?$")
 
 
 class Blad(Exception):
-    """Błąd z komunikatem dla człowieka (trafia na stronę)."""
+    """Błąd z komunikatem dla człowieka (trafia na stronę).
+
+    kod i zmienne — dla tłumaczeń (plan „Język”, Darek 11.11.2026): strona dobiera tekst po kodzie,
+    polski tekst zostaje jako zapas."""
+
+    def __init__(self, tekst, kod=None, **zmienne):
+        super().__init__(tekst)
+        self.kod = kod
+        self.zmienne = zmienne
 
 
 def teraz():
@@ -149,23 +157,25 @@ def skanuj(config):
             # Zalecamy dyski zewnętrzne (USB): odłączysz go i schowasz — kopia przetrwa awarię serwera.
             zewnetrzny = (d.get("tran") or "").lower() == "usb"
             uwaga = ""
+            uwaga_kod = ""      # dla tłumaczeń (strona dobiera tekst po kodzie)
             nadaje = True
             if not fs:
                 nadaje = False
-                uwaga = "Pusty dysk — trzeba go najpierw przygotować (sformatować)."
+                uwaga, uwaga_kod = "Pusty dysk — trzeba go najpierw przygotować (sformatować).", "empty"
             elif fs in FS_WINDOWS:
                 nadaje = False
-                uwaga = "Dysk w formacie Windows — nie nadaje się na kopie (trzeba by go sformatować, co usuwa jego zawartość)."
+                uwaga, uwaga_kod = "Dysk w formacie Windows — nie nadaje się na kopie (trzeba by go sformatować, co usuwa jego zawartość).", "windows"
             elif fs not in DOBRE_FS:
                 nadaje = False
-                uwaga = f"Nieobsługiwany system plików ({fs})."
+                uwaga, uwaga_kod = f"Nieobsługiwany system plików ({fs}).", "unsupported_fs"
             elif systemowy:
-                uwaga = "To dysk systemu — kopia nie ochroni przed jego awarią. Zalecamy dysk zewnętrzny (USB)."
+                uwaga, uwaga_kod = "To dysk systemu — kopia nie ochroni przed jego awarią. Zalecamy dysk zewnętrzny (USB).", "system"
             elif not zewnetrzny:
-                uwaga = "Dysk wewnętrzny — zalecamy dysk zewnętrzny (USB)."
+                uwaga, uwaga_kod = "Dysk wewnętrzny — zalecamy dysk zewnętrzny (USB).", "internal"
             dyski.append({
                 "id": p.get("uuid") or p.get("path"),
                 "nazwa": nazwa_dysku(d, p),
+                "model": (d.get("model") or "").strip(), "etykieta": (p.get("label") or "").strip(),
                 "urzadzenie": p.get("path"),
                 "wielkosc": p.get("size"),
                 "wolne": p.get("fsavail"),
@@ -174,6 +184,7 @@ def skanuj(config):
                 "zewnetrzny": zewnetrzny,
                 "nadaje": nadaje,
                 "uwaga": uwaga,
+                "uwaga_kod": uwaga_kod, "fs": fs or "",
             })
 
     # Zalecane (zewnętrzne, nadające się) na górze listy.
@@ -227,10 +238,10 @@ def podepnij_dysk(uuid):
         return cel
     urzadzenie = uruchom(["blkid", "-U", uuid]).stdout.strip()
     if not urzadzenie:
-        raise Blad("Dysk na kopie nie jest podłączony. Podłącz go i spróbuj ponownie.")
+        raise Blad("Dysk na kopie nie jest podłączony. Podłącz go i spróbuj ponownie.", "disk_missing")
     fs = uruchom(["blkid", "-s", "TYPE", "-o", "value", urzadzenie]).stdout.strip()
     if fs not in DOBRE_FS:
-        raise Blad("Wybrany dysk nie nadaje się na kopie (system plików). Wybierz inny dysk.")
+        raise Blad("Wybrany dysk nie nadaje się na kopie (system plików). Wybierz inny dysk.", "disk_bad_fs")
     os.makedirs(PUNKT_MONTOWANIA, exist_ok=True)
     with open("/etc/fstab", encoding="utf-8") as f:
         fstab = f.read()
@@ -240,7 +251,7 @@ def podepnij_dysk(uuid):
         uruchom(["systemctl", "daemon-reload"])
     wynik = uruchom(["mount", PUNKT_MONTOWANIA])
     if wynik.returncode != 0 or not punkt_dysku(uuid):
-        raise Blad("Nie udało się podpiąć dysku na kopie.")
+        raise Blad("Nie udało się podpiąć dysku na kopie.", "disk_mount_failed")
     return PUNKT_MONTOWANIA
 
 
@@ -253,7 +264,7 @@ def przygotuj_folder(cel):
         with open(znacznik, "w", encoding="utf-8") as f:
             json.dump({"serwer": socket.gethostname(), "zalozono": teraz()}, f)
     elif not os.path.isfile(znacznik):
-        raise Blad(f"Na dysku jest folder {FOLDER_KOPII}, ale bez znacznika kopii IF — nie zapisuję do niego.")
+        raise Blad(f"Na dysku jest folder {FOLDER_KOPII}, ale bez znacznika kopii IF — nie zapisuję do niego.", "folder_no_marker", folder=FOLDER_KOPII)
     # Pozostałości po przerwanej kopii (nasze foldery „.w-toku”).
     for nazwa in os.listdir(folder):
         if nazwa.endswith(".w-toku"):
@@ -288,7 +299,8 @@ def rsync(zrodlo, cel, poprzednia, wyklucz=(), postep=None):
     kod = proces.wait()
     # 24 = część plików zniknęła w trakcie kopii (zwykłe przy działających programach) — nie błąd.
     if kod not in (0, 24):
-        raise Blad(f"Kopiowanie {zrodlo} nie powiodło się (rsync {kod}): {bledy.strip().splitlines()[-1] if bledy.strip() else ''}")
+        raise Blad(f"Kopiowanie {zrodlo} nie powiodło się (rsync {kod}): {bledy.strip().splitlines()[-1] if bledy.strip() else ''}",
+                   "rsync_failed", zrodlo=zrodlo, kod=kod, blad=bledy.strip().splitlines()[-1] if bledy.strip() else "")
 
 
 def docker_ids(*filtry):
@@ -301,11 +313,11 @@ def docker_ids(*filtry):
 def kopia(config, tylko=None):
     """Kopia według ustawień; tylko=<aplikacja> — mała kopia jednej aplikacji (np. przed aktualizacją)."""
     if tylko is not None and (not re.match(r"^[A-Za-z0-9._-]+$", tylko) or tylko in (".", "..") or tylko in NIE_ZATRZYMUJ):
-        raise Blad("Niepoprawna aplikacja.")
+        raise Blad("Niepoprawna aplikacja.", "bad_app")
     ustawienia = czytaj_json(os.path.join(config, "backup-ustawienia.json")) or {}
     uuid = ustawienia.get("dysk")
     if not uuid:
-        raise Blad("Najpierw wybierz dysk dla kopii zapasowych i zapisz ustawienia.")
+        raise Blad("Najpierw wybierz dysk dla kopii zapasowych i zapisz ustawienia.", "no_disk_set")
     zakres = ustawienia.get("zakres") or {"aplikacje": True, "pliki": True, "ustawienia": True}
     if tylko:
         zakres = {"aplikacje": True}
@@ -314,7 +326,8 @@ def kopia(config, tylko=None):
     dom = katalog_domowy(config)
 
     start = time.time()
-    zapisz_stan(config, stan="trwa", rodzaj="kopia", procent=0, etap="Przygotowanie dysku", start=teraz(), koniec=None, komunikat="")
+    zapisz_stan(config, stan="trwa", rodzaj="kopia", procent=0, etap="Przygotowanie dysku", etap_kod="disk", etap_zmienne={},
+                start=teraz(), koniec=None, komunikat="", komunikat_kod="", zmienne={})
     cel = podepnij_dysk(uuid)
     folder = przygotuj_folder(cel)
     poprzednie = kopie(folder)
@@ -332,9 +345,9 @@ def kopia(config, tylko=None):
     suma = sum(wagi.values()) or 1
     zrobione = 0
 
-    def postep(czesc, ulamek, etap):
+    def postep(czesc, ulamek, etap, etap_kod="", **etap_zmienne):
         procent = int(100 * (zrobione + wagi[czesc] * min(1.0, ulamek)) / suma)
-        zapisz_stan(config, procent=min(99, procent), etap=etap)
+        zapisz_stan(config, procent=min(99, procent), etap=etap, etap_kod=etap_kod, etap_zmienne=etap_zmienne)
 
     def z_poprzedniej(*sciezka):
         return os.path.join(poprzednia, *sciezka) if poprzednia else None
@@ -344,12 +357,12 @@ def kopia(config, tylko=None):
         stosy = sorted(n for n in os.listdir(app) if os.path.isdir(os.path.join(app, n))) if os.path.isdir(app) else []
         if tylko:
             if tylko not in stosy:
-                raise Blad(f"Nie ma aplikacji {tylko} na serwerze.")
+                raise Blad(f"Nie ma aplikacji {tylko} na serwerze.", "app_not_on_server", aplikacja=tylko)
             stosy = [tylko]
         skopiowane_wolumeny = set()
         wolumeny_stosow = {}
         for n, stos in enumerate(stosy):
-            postep("aplikacje", n / max(1, len(stosy)), f"Aplikacje: {stos}")
+            postep("aplikacje", n / max(1, len(stosy)), f"Aplikacje: {stos}", "app", aplikacja=stos)
             ids = [] if stos in NIE_ZATRZYMUJ else docker_ids(f"label=com.docker.compose.project.working_dir={os.path.join(app, stos)}")
             projekt = ""
             if ids:
@@ -373,7 +386,7 @@ def kopia(config, tylko=None):
                     uruchom(["docker", "start", *ids])
         # Reszta ~/docker (pliki poza stosami) i wolumeny bez stosu — tylko w pełnej kopii.
         if not tylko:
-            postep("aplikacje", 0.95, "Aplikacje: pozostałe pliki")
+            postep("aplikacje", 0.95, "Aplikacje: pozostałe pliki", "app_rest")
             rsync(os.path.join(dom, "docker") + "/", os.path.join(roboczy, "aplikacje", "docker"),
                   z_poprzedniej("aplikacje", "docker"), wyklucz=["/app/", "/app-data/"])
         if not tylko and os.path.isdir(WOLUMENY_DOCKERA):
@@ -393,11 +406,11 @@ def kopia(config, tylko=None):
         if cel.startswith(MNT + "/"):
             wyklucz.append("/" + os.path.relpath(cel, MNT) + "/")
         rsync(MNT + "/", os.path.join(roboczy, "pliki", "mnt"), z_poprzedniej("pliki", "mnt"), wyklucz=wyklucz,
-              postep=lambda p: postep("pliki", p / 100, f"Twoje pliki: {p}%"))
+              postep=lambda p: postep("pliki", p / 100, f"Twoje pliki: {p}%", "files", procent=p))
         zrobione += wagi["pliki"]
 
     if "ustawienia" in czesci:
-        postep("ustawienia", 0, "Ustawienia serwera")
+        postep("ustawienia", 0, "Ustawienia serwera", "settings")
         for zrodlo in USTAWIENIA_SERWERA:
             if os.path.isdir(zrodlo):
                 rsync(zrodlo + "/", os.path.join(roboczy, "ustawienia", zrodlo.strip("/")), z_poprzedniej("ustawienia", zrodlo.strip("/")))
@@ -428,7 +441,7 @@ def kopia(config, tylko=None):
     lista = kopie(folder)
 
     wolne = shutil.disk_usage(folder).free
-    zapisz_stan(config, stan="gotowa", procent=100, etap="Gotowe", koniec=teraz(), komunikat="",
+    zapisz_stan(config, stan="gotowa", procent=100, etap="Gotowe", etap_kod="done", etap_zmienne={}, koniec=teraz(), komunikat="",
                 ostatnia={"data": teraz(), "folder": nazwa, "rozmiar": rozmiar, "czas_s": czas, "wynik": "ok", "czesciowa": tylko or ""},
                 **({} if tylko else {"ostatnia_pelna": teraz()}),
                 kopie=lista, usuniete=usuniete, wolne=wolne, kopie_opis=opis_kopii(folder))
@@ -463,46 +476,48 @@ def przywroc(config, nazwa_kopii, stos):
     z tej kopii, po kolei. Niczego nie kasuje: obecne dane odkłada do ~/backups/przed-przywroceniem."""
     if stos == "*":
         if not WZOR_KOPII.match(nazwa_kopii or ""):
-            raise Blad("Niepoprawna kopia.")
+            raise Blad("Niepoprawna kopia.", "bad_copy")
         uuid = (czytaj_json(os.path.join(config, "backup-ustawienia.json")) or {}).get("dysk")
         if not uuid:
-            raise Blad("Nie wybrano dysku z kopiami.")
+            raise Blad("Nie wybrano dysku z kopiami.", "no_copy_disk")
         app = os.path.join(podepnij_dysk(uuid), FOLDER_KOPII, nazwa_kopii, "aplikacje", "docker", "app")
         wszystkie = sorted(n for n in os.listdir(app) if os.path.isdir(os.path.join(app, n)) and n not in NIE_ZATRZYMUJ) if os.path.isdir(app) else []
         if not wszystkie:
-            raise Blad(f"W kopii {nazwa_kopii} nie ma aplikacji.")
+            raise Blad(f"W kopii {nazwa_kopii} nie ma aplikacji.", "copy_no_apps", kopia=nazwa_kopii)
         odlozone = []
         for n, jedna in enumerate(wszystkie):
-            odlozone.append(przywroc_jedna(config, nazwa_kopii, jedna, f"({n + 1} z {len(wszystkie)})"))
-        zapisz_stan(config, stan="gotowa", procent=100, etap="Gotowe", koniec=teraz(), komunikat="",
-                    przywrocenie={"data": teraz(), "kopia": nazwa_kopii, "aplikacja": "wszystkie aplikacje", "wynik": "ok",
+            odlozone.append(przywroc_jedna(config, nazwa_kopii, jedna, f"({n + 1} z {len(wszystkie)})", n + 1, len(wszystkie)))
+        zapisz_stan(config, stan="gotowa", procent=100, etap="Gotowe", etap_kod="done", etap_zmienne={}, koniec=teraz(), komunikat="",
+                    przywrocenie={"data": teraz(), "kopia": nazwa_kopii, "aplikacja": "wszystkie aplikacje", "wszystkie": True, "wynik": "ok",
                                   "odlozone": os.path.dirname(odlozone[0]) if odlozone else ""})
         return
     odloz = przywroc_jedna(config, nazwa_kopii, stos, "")
-    zapisz_stan(config, stan="gotowa", procent=100, etap="Gotowe", koniec=teraz(), komunikat="",
+    zapisz_stan(config, stan="gotowa", procent=100, etap="Gotowe", etap_kod="done", etap_zmienne={}, koniec=teraz(), komunikat="",
                 przywrocenie={"data": teraz(), "kopia": nazwa_kopii, "aplikacja": stos, "wynik": "ok", "odlozone": odloz})
 
 
-def przywroc_jedna(config, nazwa_kopii, stos, licznik):
+def przywroc_jedna(config, nazwa_kopii, stos, licznik, nr=0, ile=0):
     """Przywraca jedną aplikację; zwraca folder z odłożonymi danymi sprzed przywrócenia."""
     if not WZOR_KOPII.match(nazwa_kopii or "") or not re.match(r"^[A-Za-z0-9._-]+$", stos or "") or stos in (".", ".."):
-        raise Blad("Niepoprawna kopia albo aplikacja.")
+        raise Blad("Niepoprawna kopia albo aplikacja.", "bad_copy_or_app")
     if stos in NIE_ZATRZYMUJ:
-        raise Blad("Strony startowej nie przywraca się z niej samej.")
+        raise Blad("Strony startowej nie przywraca się z niej samej.", "restore_self")
     ustawienia = czytaj_json(os.path.join(config, "backup-ustawienia.json")) or {}
     if not ustawienia.get("dysk"):
-        raise Blad("Nie wybrano dysku z kopiami.")
+        raise Blad("Nie wybrano dysku z kopiami.", "no_copy_disk")
     dom = katalog_domowy(config)
-    zapisz_stan(config, stan="trwa", rodzaj="przywracanie", procent=0, etap=f"Przywracanie: {stos} {licznik}".strip(), start=teraz(), koniec=None, komunikat="")
+    zapisz_stan(config, stan="trwa", rodzaj="przywracanie", procent=0, etap=f"Przywracanie: {stos} {licznik}".strip(),
+                etap_kod="restore_multi" if ile else "restore", etap_zmienne={"aplikacja": stos, "nr": nr, "ile": ile},
+                start=teraz(), koniec=None, komunikat="", komunikat_kod="", zmienne={})
 
     cel = podepnij_dysk(ustawienia["dysk"])
     folder = os.path.join(cel, FOLDER_KOPII)
     if not os.path.isfile(os.path.join(folder, ZNACZNIK)):
-        raise Blad("Na dysku nie ma kopii IF (brak znacznika).")
+        raise Blad("Na dysku nie ma kopii IF (brak znacznika).", "no_if_copies")
     zrodlo = os.path.join(folder, nazwa_kopii)
     czesci = [c for c in ("app", "app-data") if os.path.isdir(os.path.join(zrodlo, "aplikacje", "docker", c, stos))]
     if not czesci:
-        raise Blad(f"W kopii {nazwa_kopii} nie ma aplikacji {stos}.")
+        raise Blad(f"W kopii {nazwa_kopii} nie ma aplikacji {stos}.", "copy_no_app", kopia=nazwa_kopii, aplikacja=stos)
     wolumeny = (czytaj_json(os.path.join(zrodlo, "manifest.json")) or {}).get("wolumeny", {}).get(stos, [])
 
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -510,19 +525,21 @@ def przywroc_jedna(config, nazwa_kopii, stos, licznik):
     os.makedirs(odloz, exist_ok=True)
     folder_stosu = os.path.join(dom, "docker", "app", stos)
     ids = docker_ids(f"label=com.docker.compose.project.working_dir={folder_stosu}")
-    zapisz_stan(config, procent=10, etap=f"Przywracanie: {stos} — zatrzymanie aplikacji")
+    zapisz_stan(config, procent=10, etap=f"Przywracanie: {stos} — zatrzymanie aplikacji", etap_kod="restore_stop", etap_zmienne={"aplikacja": stos})
     if ids:
         uruchom(["docker", "stop", *ids])
     try:
         kroki = len(czesci) + len(wolumeny)
         for n, czesc in enumerate(czesci):
-            zapisz_stan(config, procent=15 + int(75 * n / kroki), etap=f"Przywracanie: {stos} ({'pliki aplikacji' if czesc == 'app' else 'dane aplikacji'})")
+            zapisz_stan(config, procent=15 + int(75 * n / kroki), etap=f"Przywracanie: {stos} ({'pliki aplikacji' if czesc == 'app' else 'dane aplikacji'})",
+                        etap_kod="restore_files" if czesc == "app" else "restore_data", etap_zmienne={"aplikacja": stos})
             obecne = os.path.join(dom, "docker", czesc, stos)
             if os.path.exists(obecne):
                 shutil.move(obecne, os.path.join(odloz, czesc))
             rsync(os.path.join(zrodlo, "aplikacje", "docker", czesc, stos) + "/", obecne, None)
         for n, wol in enumerate(wolumeny):
-            zapisz_stan(config, procent=15 + int(75 * (len(czesci) + n) / kroki), etap=f"Przywracanie: {stos} (wolumen {wol})")
+            zapisz_stan(config, procent=15 + int(75 * (len(czesci) + n) / kroki), etap=f"Przywracanie: {stos} (wolumen {wol})",
+                        etap_kod="restore_volume", etap_zmienne={"aplikacja": stos, "wolumen": wol})
             kopia_wol = os.path.join(zrodlo, "aplikacje", "wolumeny", wol)
             obecny = os.path.join(WOLUMENY_DOCKERA, wol)
             if not os.path.isdir(kopia_wol):
@@ -532,7 +549,7 @@ def przywroc_jedna(config, nazwa_kopii, stos, licznik):
             rsync(kopia_wol + "/", obecny, None)
     finally:
         if ids:
-            zapisz_stan(config, procent=95, etap=f"Przywracanie: {stos} — uruchomienie aplikacji")
+            zapisz_stan(config, procent=95, etap=f"Przywracanie: {stos} — uruchomienie aplikacji", etap_kod="restore_start", etap_zmienne={"aplikacja": stos})
             uruchom(["docker", "start", *ids])
     return odloz
 
@@ -548,13 +565,16 @@ def z_blokada(config, rodzaj, praca):
         try:
             praca()
         except Blad as blad:
-            zapisz_stan(config, stan="blad", etap="Błąd", koniec=teraz(), komunikat=str(blad),
-                        **{pole: {"data": teraz(), "wynik": "blad", "komunikat": str(blad)}})
+            zapisz_stan(config, stan="blad", etap="Błąd", etap_kod="error", etap_zmienne={}, koniec=teraz(), komunikat=str(blad),
+                        komunikat_kod=blad.kod or "", zmienne=blad.zmienne,
+                        **{pole: {"data": teraz(), "wynik": "blad", "komunikat": str(blad), "kod": blad.kod or "", "zmienne": blad.zmienne}})
         except Exception as blad:  # nieprzewidziany błąd — też na stronę, szczegóły w dzienniku systemu
             print(f"if-backup: {blad!r}", file=sys.stderr)
             tekst = ("Kopia" if rodzaj == "kopia" else "Przywracanie") + " nie powiodło się (szczegóły: journalctl -u if-backup)."
-            zapisz_stan(config, stan="blad", etap="Błąd", koniec=teraz(), komunikat=tekst,
-                        **{pole: {"data": teraz(), "wynik": "blad", "komunikat": tekst}})
+            kod = "backup_unexpected" if rodzaj == "kopia" else "restore_unexpected"
+            zapisz_stan(config, stan="blad", etap="Błąd", etap_kod="error", etap_zmienne={}, koniec=teraz(), komunikat=tekst,
+                        komunikat_kod=kod, zmienne={},
+                        **{pole: {"data": teraz(), "wynik": "blad", "komunikat": tekst, "kod": kod, "zmienne": {}}})
 
 
 def kopia_bezpieczna(config):

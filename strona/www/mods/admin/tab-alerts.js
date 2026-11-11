@@ -1,3 +1,7 @@
+// Napisy karty (plan „Język”, Etap 3): sekcja admin.alerts; dymki: admin.messages.
+const alertsT = (key, vars) => escapeHtml(t(`admin.alerts.${key}`, vars));
+const alertsTn = (key, n) => tn(`admin.alerts.${key}`, n);
+
 // tab-alerts.js — Moduł Zakładki „Centrum Alertów i Diagnostyka” (mods/admin)
 
 let currentAlertFilter = "all";
@@ -9,43 +13,43 @@ function renderAlertsTab() {
       <!-- 1. Karta KPI i statusu na żywo -->
       <section class="admin-section-card">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-          <h2 style="margin: 0;">${uiIcon("alerts", 22)} Stan Usług i Kondycja Serwera</h2>
+          <h2 style="margin: 0;">${uiIcon("alerts", 22)} ${alertsT("title")}</h2>
           <div style="display: flex; align-items: center; gap: 10px;">
             <div id="alertsLiveBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: var(--alerts-wyniki); font-weight: 700; background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: var(--muted);">
               <span id="alertsLiveDot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
-              <span id="alertsLiveText">Aktualne</span>
+              <span id="alertsLiveText">${alertsT("live_current")}</span>
             </div>
-            <button type="button" class="button" id="btnRefreshAlertsTab">${uiIcon("refresh", 16)} Odśwież</button>
+            <button type="button" class="button" id="btnRefreshAlertsTab">${uiIcon("refresh", 16)} ${alertsT("refresh")}</button>
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
-            <header style="margin-bottom: 8px;"><h3>Stan ogólny</h3></header>
+            <header style="margin-bottom: 8px;"><h3>${alertsT("kpi_status")}</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
               <strong id="valAlertsStatus" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">--</strong>
-              <span id="subAlertsStatus" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">Inicjalizacja</span>
+              <span id="subAlertsStatus" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">${alertsT("kpi_initializing")}</span>
             </div>
           </div>
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
-            <header style="margin-bottom: 8px;"><h3>Aktywne alerty</h3></header>
+            <header style="margin-bottom: 8px;"><h3>${alertsT("kpi_alerts")}</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
               <strong id="valAlertsTotal" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">0</strong>
-              <span id="subAlertsTotal" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">0 krytycznych</span>
+              <span id="subAlertsTotal" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">${escapeHtml(alertsTn("crit_short", 0))}</span>
             </div>
           </div>
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
-            <header style="margin-bottom: 8px;"><h3>Kontenery Docker</h3></header>
+            <header style="margin-bottom: 8px;"><h3>${alertsT("kpi_containers")}</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
               <strong id="valAlertsRunning" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">--</strong>
-              <span id="subAlertsTotalCont" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">Wszystkich: --</span>
+              <span id="subAlertsTotalCont" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">${alertsT("kpi_containers_total")}</span>
             </div>
           </div>
           <div class="cockpit-stat-card" style="margin: 0; min-height: auto; padding: 18px;">
-            <header style="margin-bottom: 8px;"><h3>Sprzęt</h3></header>
+            <header style="margin-bottom: 8px;"><h3>${alertsT("kpi_hardware")}</h3></header>
             <div style="display: flex; flex-direction: column; gap: 4px;">
-              <strong id="valAlertsCpu" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">-- °C</strong>
-              <span id="subAlertsRam" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">RAM: --%</span>
+              <strong id="valAlertsCpu" style="font-size: calc(var(--alerts-wyniki) + 5px); line-height: 1.2;">-- ${IF_FORMAT.tempUnit()}</strong>
+              <span id="subAlertsRam" style="font-size: var(--alerts-wyniki); color: var(--muted); line-height: 1.4; word-break: break-word;">${alertsT("ram_value", { value: "--%" })}</span>
             </div>
           </div>
         </div>
@@ -54,77 +58,77 @@ function renderAlertsTab() {
       <!-- 1b. Progi temperatur (każdy serwer ma swoje normy) -->
       <section class="admin-section-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <h2 style="margin: 0;">${uiIcon("thermometer", 22)} Progi temperatur</h2>
+          <h2 style="margin: 0;">${uiIcon("thermometer", 22)} ${alertsT("temp_title")}</h2>
         </div>
-        <p class="settings-note">Każdy komputer ma swoje normy. Powyżej progu „Uwaga” temperatura świeci na pomarańczowo, powyżej progu „Alarm” — na czerwono.</p>
+        <p class="settings-note">${alertsT("temp_intro")}</p>
         <div id="tempThresholdsBox" style="margin-top: 12px;">
-          <div class="empty">Odczyt czujników...</div>
+          <div class="empty">${alertsT("temp_loading")}</div>
         </div>
         <div class="temp-thresholds-actions">
-          <button type="button" class="button" id="btnTempThresholdsReset">Resetuj do domyślnych</button>
-          <button type="button" class="button primary" id="btnTempThresholdsSave">Zapisz</button>
+          <button type="button" class="button" id="btnTempThresholdsReset">${alertsT("reset_defaults")}</button>
+          <button type="button" class="button primary" id="btnTempThresholdsSave">${alertsT("save")}</button>
         </div>
       </section>
 
       <!-- 1c. Progi obciążenia CPU i RAM (tylko kolor kafelków w nagłówku) -->
       <section class="admin-section-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <h2 style="margin: 0;">${uiIcon("trending", 22)} Progi obciążenia</h2>
+          <h2 style="margin: 0;">${uiIcon("trending", 22)} ${alertsT("load_title")}</h2>
         </div>
-        <p class="settings-note">Kolor kafelków CPU i RAM w nagłówku Strony Głównej. Wysokie obciążenie to zwykle praca (np. OCR, galeria zdjęć), nie awaria — dlatego bez paska alarmowego. RAM powyżej 95% trafia dodatkowo do dzwonka.</p>
+        <p class="settings-note">${alertsT("load_intro")}</p>
         <div id="loadThresholdsBox" style="margin-top: 12px;">
-          <div class="empty">Odczyt obciążenia...</div>
+          <div class="empty">${alertsT("load_loading")}</div>
         </div>
         <div class="temp-thresholds-actions">
-          <button type="button" class="button" id="btnLoadThresholdsReset">Resetuj do domyślnych</button>
-          <button type="button" class="button primary" id="btnLoadThresholdsSave">Zapisz</button>
+          <button type="button" class="button" id="btnLoadThresholdsReset">${alertsT("reset_defaults")}</button>
+          <button type="button" class="button primary" id="btnLoadThresholdsSave">${alertsT("save")}</button>
         </div>
       </section>
 
       <!-- 2. Wykryte Zgłoszenia i Awarie -->
       <section class="admin-section-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-          <h2 style="margin: 0;">${uiIcon("warning", 22)} Wykryte Zgłoszenia i Awarie</h2>
-          <span id="activeIncidentsBadge" style="font-size: var(--alerts-wyniki); font-weight: 700; padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid var(--line);">0 zgłoszeń</span>
+          <h2 style="margin: 0;">${uiIcon("warning", 22)} ${alertsT("incidents_title")}</h2>
+          <span id="activeIncidentsBadge" style="font-size: var(--alerts-wyniki); font-weight: 700; padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid var(--line);">${escapeHtml(alertsTn("incidents_count", 0))}</span>
         </div>
         <div id="alertsIncidentsList" style="display: flex; flex-direction: column; gap: 10px;">
-          <div class="empty">Pobieranie alertów...</div>
+          <div class="empty">${alertsT("incidents_loading")}</div>
         </div>
       </section>
 
       <!-- 3. Wszystkie Kontenery Docker -->
       <section class="admin-section-card">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
-          <h2 style="margin: 0;">${uiIcon("container", 22)} Wszystkie Kontenery Docker</h2>
+          <h2 style="margin: 0;">${uiIcon("container", 22)} ${alertsT("containers_title")}</h2>
           <div class="filter-actions" style="display: flex; gap: 6px;">
-            <button type="button" class="button filter-btn active" data-alert-filter="all">Wszystkie</button>
-            <button type="button" class="button filter-btn" data-alert-filter="issues">Tylko z problemem</button>
-            <button type="button" class="button filter-btn" data-alert-filter="running">Uruchomione</button>
+            <button type="button" class="button filter-btn active" data-alert-filter="all">${alertsT("filter_all")}</button>
+            <button type="button" class="button filter-btn" data-alert-filter="issues">${alertsT("filter_issues")}</button>
+            <button type="button" class="button filter-btn" data-alert-filter="running">${alertsT("filter_running")}</button>
           </div>
         </div>
         <div id="alertsContainersGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">
-          <div class="empty">Pobieranie stanu kontenerów...</div>
+          <div class="empty">${alertsT("containers_loading")}</div>
         </div>
       </section>
 
       <!-- 4. Narzędzia Administracyjne -->
       <section class="admin-section-card">
-        <h2 style="margin: 0 0 4px 0;">${uiIcon("tools", 22)} Wybierz narzędzie administracyjne</h2>
-        <p style="margin: 0 0 16px 0; font-size: var(--alerts-wyniki); color: var(--muted);">Bezpośrednie odnośniki do centralnych konsol zarządzania serwerem</p>
+        <h2 style="margin: 0 0 4px 0;">${uiIcon("tools", 22)} ${alertsT("tools_title")}</h2>
+        <p style="margin: 0 0 16px 0; font-size: var(--alerts-wyniki); color: var(--muted);">${alertsT("tools_intro")}</p>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
           <a id="tabLinkCockpit" href="#" target="_blank" rel="noreferrer" class="tool-card" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); text-decoration: none; color: inherit; transition: transform 0.15s ease, background 0.15s ease;">
             <span style="display: inline-flex; color: var(--accent);">${uiIcon("terminal", 26)}</span>
             <div>
-              <strong style="display: block; font-size: var(--alerts-wyniki); color: var(--text);">Cockpit Linux</strong>
-              <span style="font-size: var(--alerts-wyniki); color: var(--muted);">Panel OS i logi (:9090)</span>
+              <strong style="display: block; font-size: var(--alerts-wyniki); color: var(--text);">${alertsT("tool_cockpit")}</strong>
+              <span style="font-size: var(--alerts-wyniki); color: var(--muted);">${alertsT("tool_cockpit_desc")}</span>
             </div>
             <span style="margin-left: auto; display: inline-flex; color: var(--muted);">${uiIcon("external", 14)}</span>
           </a>
           <a id="tabLinkDockge" href="#" target="_blank" rel="noreferrer" class="tool-card" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); text-decoration: none; color: inherit; transition: transform 0.15s ease, background 0.15s ease;">
             <span style="display: inline-flex; color: var(--accent);">${uiIcon("container", 26)}</span>
             <div>
-              <strong style="display: block; font-size: var(--alerts-wyniki); color: var(--text);">Dockge Stacks</strong>
-              <span style="font-size: var(--alerts-wyniki); color: var(--muted);">Zarządzanie kontenerami (:5001)</span>
+              <strong style="display: block; font-size: var(--alerts-wyniki); color: var(--text);">${alertsT("tool_dockge")}</strong>
+              <span style="font-size: var(--alerts-wyniki); color: var(--muted);">${alertsT("tool_dockge_desc")}</span>
             </div>
             <span style="margin-left: auto; display: inline-flex; color: var(--muted);">${uiIcon("external", 14)}</span>
           </a>
@@ -161,25 +165,37 @@ function tempLevelClass(sensor) {
   return "is-ok";
 }
 
+// Progi w jednostce z Ustawień ogólnych (°C / °F); serwer zapisuje je w °C. Pole zapamiętuje wartość
+// w °C (data-celsius) — nieruszone pole wysyła ją bez przeliczania, żeby °F → °C nie przesuwało progów.
+function tempThresholdInput(role, celsius) {
+  const shown = Math.round(IF_FORMAT.tempValue(celsius));
+  return `<input type="number" min="${Math.ceil(IF_FORMAT.tempValue(1))}" max="${Math.floor(IF_FORMAT.tempValue(150))}" step="1" data-role="${role}" value="${shown}" data-shown="${shown}" data-celsius="${celsius}">`;
+}
+
+function tempThresholdCelsius(input) {
+  if (input.value === input.dataset.shown && input.dataset.celsius !== undefined) return Number(input.dataset.celsius);
+  return Math.round(IF_FORMAT.tempToCelsius(Number(input.value)) * 10) / 10;
+}
+
 function renderTempThresholds() {
   const box = document.querySelector("#tempThresholdsBox");
   if (!box) return;
   if (!cachedTempSensors.length) {
-    box.innerHTML = '<div class="empty">System nie udostępnia czujników temperatury.</div>';
+    box.innerHTML = `<div class="empty">${alertsT("temp_none")}</div>`;
     return;
   }
   box.innerHTML = `
     <table class="temp-thresholds-table">
       <thead>
-        <tr><th>Czujnik</th><th>Obecnie</th><th>Uwaga (°C)</th><th>Alarm (°C)</th></tr>
+        <tr><th>${alertsT("col_sensor")}</th><th>${alertsT("col_now")}</th><th>${alertsT("col_warn_c", { unit: IF_FORMAT.tempUnit() })}</th><th>${alertsT("col_alarm_c", { unit: IF_FORMAT.tempUnit() })}</th></tr>
       </thead>
       <tbody>
         ${cachedTempSensors.map((sensor) => `
           <tr data-sensor-id="${escapeHtml(sensor.id)}">
-            <td>${escapeHtml(sensor.name)}</td>
-            <td><span class="temp-now ${tempLevelClass(sensor)}" data-role="temp-now">${Math.round(sensor.temp)}°C</span></td>
-            <td><input type="number" min="1" max="150" step="1" data-role="warn" value="${sensor.warn}"></td>
-            <td><input type="number" min="1" max="150" step="1" data-role="alarm" value="${sensor.alarm}"></td>
+            <td>${escapeHtml(serverSensorName(sensor.nameParts, sensor.name, "admin.alerts"))}</td>
+            <td data-label="${alertsT("col_now")}"><span class="temp-now ${tempLevelClass(sensor)}" data-role="temp-now">${IF_FORMAT.temp(sensor.temp)}</span></td>
+            <td data-label="${alertsT("col_warn_c", { unit: IF_FORMAT.tempUnit() })}">${tempThresholdInput("warn", sensor.warn)}</td>
+            <td data-label="${alertsT("col_alarm_c", { unit: IF_FORMAT.tempUnit() })}">${tempThresholdInput("alarm", sensor.alarm)}</td>
           </tr>
         `).join("")}
       </tbody>
@@ -196,7 +212,7 @@ function refreshTempNow() {
       if (!cell) continue;
       const warn = Number(row.querySelector('[data-role="warn"]').value) || sensor.warn;
       const alarm = Number(row.querySelector('[data-role="alarm"]').value) || sensor.alarm;
-      cell.textContent = `${Math.round(sensor.temp)}°C`;
+      cell.textContent = IF_FORMAT.temp(sensor.temp);
       cell.className = `temp-now ${tempLevelClass({ temp: sensor.temp, warn, alarm })}`;
     }
   }).catch(() => {});
@@ -209,7 +225,7 @@ async function loadTempThresholds() {
     renderTempThresholds();
   } catch (error) {
     const box = document.querySelector("#tempThresholdsBox");
-    if (box) box.innerHTML = `<div class="empty" style="color:var(--danger);">Błąd odczytu czujników: ${escapeHtml(error.message)}</div>`;
+    if (box) box.innerHTML = `<div class="empty" style="color:var(--danger);">${alertsT("temp_error", { message: error.message })}</div>`;
   }
 }
 
@@ -217,26 +233,32 @@ function resetTempThresholds() {
   document.querySelectorAll("#tempThresholdsBox tr[data-sensor-id]").forEach((row) => {
     const sensor = cachedTempSensors.find((item) => item.id === row.dataset.sensorId);
     if (!sensor) return;
-    row.querySelector('[data-role="warn"]').value = sensor.defaultWarn;
-    row.querySelector('[data-role="alarm"]').value = sensor.defaultAlarm;
+    row.querySelector('[data-role="warn"]').outerHTML = tempThresholdInput("warn", sensor.defaultWarn);
+    row.querySelector('[data-role="alarm"]').outerHTML = tempThresholdInput("alarm", sensor.defaultAlarm);
   });
   refreshTempNow();
-  showToast("Wpisano progi domyślne — kliknij „Zapisz”, żeby je zachować.");
+  showToast(t("admin.messages.thresholds_defaults"));
 }
 
 async function saveTempThresholds() {
   const sensors = {};
+  let outOfRange = "";
   document.querySelectorAll("#tempThresholdsBox tr[data-sensor-id]").forEach((row) => {
-    sensors[row.dataset.sensorId] = {
-      warn: Number(row.querySelector('[data-role="warn"]').value),
-      alarm: Number(row.querySelector('[data-role="alarm"]').value)
-    };
+    const warn = tempThresholdCelsius(row.querySelector('[data-role="warn"]'));
+    const alarm = tempThresholdCelsius(row.querySelector('[data-role="alarm"]'));
+    if (!outOfRange && (!Number.isFinite(warn) || !Number.isFinite(alarm) || warn < 1 || alarm > 150)) {
+      const sensor = cachedTempSensors.find((item) => item.id === row.dataset.sensorId);
+      outOfRange = sensor ? serverSensorName(sensor.nameParts, sensor.name, "admin.alerts") : row.dataset.sensorId;
+    }
+    sensors[row.dataset.sensorId] = { warn, alarm };
   });
+  // Zakres sprawdzany już tutaj — w jednostce, w której wpisujesz (°C / °F).
+  if (outOfRange) return showToast(t("admin.messages.err_temp_threshold_range", { sensor: outOfRange, min: IF_FORMAT.temp(1), max: IF_FORMAT.temp(150) }));
   try {
     const data = await request("/api/alerts/temperature-thresholds", { method: "PUT", body: JSON.stringify({ sensors }) });
     cachedTempSensors = data.sensors || [];
     renderTempThresholds();
-    showToast("Progi temperatur zapisane.");
+    showToast(t("admin.messages.temp_saved"));
   } catch (error) {
     showToast(error.message);
   }
@@ -244,7 +266,7 @@ async function saveTempThresholds() {
 
 // ─── Progi obciążenia CPU i RAM ───
 
-const LOAD_ROWS = [["cpu", "CPU — użycie procesora"], ["ram", "RAM — zajętość pamięci"]];
+const LOAD_ROWS = [["cpu", "load_cpu"], ["ram", "load_ram"]];
 let cachedLoadThresholds = null;
 
 function loadLevelClass(value, warn, alarm) {
@@ -261,7 +283,7 @@ function renderLoadThresholds(data) {
   box.innerHTML = `
     <table class="temp-thresholds-table">
       <thead>
-        <tr><th>Kafelek</th><th>Obecnie</th><th>Uwaga (%)</th><th>Alarm (%)</th></tr>
+        <tr><th>${alertsT("col_tile")}</th><th>${alertsT("col_now")}</th><th>${alertsT("col_warn_pct")}</th><th>${alertsT("col_alarm_pct")}</th></tr>
       </thead>
       <tbody>
         ${LOAD_ROWS.map(([key, name]) => {
@@ -269,10 +291,10 @@ function renderLoadThresholds(data) {
           const value = data.current?.[key];
           return `
             <tr data-load-key="${key}">
-              <td>${name}</td>
-              <td><span class="temp-now ${loadLevelClass(value, t.warn, t.alarm)}" data-role="load-now">${value == null ? "—" : `${Math.round(value)}%`}</span></td>
-              <td><input type="number" min="1" max="100" step="1" data-role="warn" value="${t.warn}"></td>
-              <td><input type="number" min="1" max="100" step="1" data-role="alarm" value="${t.alarm}"></td>
+              <td>${alertsT(name)}</td>
+              <td data-label="${alertsT("col_now")}"><span class="temp-now ${loadLevelClass(value, t.warn, t.alarm)}" data-role="load-now">${value == null ? "—" : `${Math.round(value)}%`}</span></td>
+              <td data-label="${alertsT("col_warn_pct")}"><input type="number" min="1" max="100" step="1" data-role="warn" value="${t.warn}"></td>
+              <td data-label="${alertsT("col_alarm_pct")}"><input type="number" min="1" max="100" step="1" data-role="alarm" value="${t.alarm}"></td>
             </tr>
           `;
         }).join("")}
@@ -286,7 +308,7 @@ async function loadLoadThresholds() {
     renderLoadThresholds(await request("/api/alerts/load-thresholds"));
   } catch (error) {
     const box = document.querySelector("#loadThresholdsBox");
-    if (box) box.innerHTML = `<div class="empty" style="color:var(--danger);">Błąd odczytu: ${escapeHtml(error.message)}</div>`;
+    if (box) box.innerHTML = `<div class="empty" style="color:var(--danger);">${alertsT("load_error", { message: error.message })}</div>`;
   }
 }
 
@@ -312,7 +334,7 @@ function resetLoadThresholds() {
     row.querySelector('[data-role="alarm"]').value = t.defaultAlarm;
   });
   refreshLoadNow();
-  showToast("Wpisano progi domyślne — kliknij „Zapisz”, żeby je zachować.");
+  showToast(t("admin.messages.thresholds_defaults"));
 }
 
 async function saveLoadThresholds() {
@@ -326,7 +348,7 @@ async function saveLoadThresholds() {
   try {
     await request("/api/alerts/load-thresholds", { method: "PUT", body: JSON.stringify(body) });
     await loadLoadThresholds();
-    showToast("Progi obciążenia zapisane.");
+    showToast(t("admin.messages.load_saved"));
   } catch (error) {
     showToast(error.message);
   }
@@ -364,7 +386,7 @@ async function loadAlertsData() {
     renderIncidents(data.alerts || []);
   } catch (error) {
     const list = document.querySelector("#alertsIncidentsList");
-    if (list) list.innerHTML = `<div class="empty" style="color:var(--danger);">Błąd pobierania danych: ${escapeHtml(error.message)}</div>`;
+    if (list) list.innerHTML = `<div class="empty" style="color:var(--danger);">${alertsT("incidents_error", { message: error.message })}</div>`;
   }
 
   try {
@@ -373,26 +395,18 @@ async function loadAlertsData() {
     renderContainersGrid(cachedContainers);
   } catch (error) {
     const grid = document.querySelector("#alertsContainersGrid");
-    if (grid) grid.innerHTML = `<div class="empty" style="color:var(--danger);">Błąd pobierania kontenerów: ${escapeHtml(error.message)}</div>`;
+    if (grid) grid.innerHTML = `<div class="empty" style="color:var(--danger);">${alertsT("containers_error", { message: error.message })}</div>`;
   }
 
   try {
     const sys = await request("/api/system/stats");
-    const temp = sys.cpu?.temperature ? `${Math.round(sys.cpu.temperature)} °C` : "—";
+    const temp = sys.cpu?.temperature ? IF_FORMAT.temp(sys.cpu.temperature) : "—";
     const ram = sys.memory?.percent != null ? `${Math.round(sys.memory.percent)}%` : "—";
     const cpuEl = document.querySelector("#valAlertsCpu");
     const ramEl = document.querySelector("#subAlertsRam");
     if (cpuEl) cpuEl.textContent = temp;
-    if (ramEl) ramEl.textContent = `RAM: ${ram}`;
+    if (ramEl) ramEl.textContent = t("admin.alerts.ram_value", { value: ram });
   } catch {}
-}
-
-// Polska odmiana: 1 informacja, 2–4 informacje, 5+ informacji (12–14 też „informacji”).
-function pluralPl(n, one, few, many) {
-  if (n === 1) return one;
-  const last = n % 10;
-  const lastTwo = n % 100;
-  return last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14) ? few : many;
 }
 
 function updateKPI(data) {
@@ -406,17 +420,17 @@ function updateKPI(data) {
   const crit = summary.critical || 0;
   const warn = summary.warning || 0;
   const info = summary.info || 0;
-  const infoText = info ? `${info} ${pluralPl(info, "informacja", "informacje", "informacji")}` : "";
+  const infoText = info ? alertsTn("info_count", info) : "";
   let state;
   if (crit > 0) {
-    state = { label: "Awaria", color: "#f87171", dot: "#ef4444", live: "Wykryto usterki",
-      sub: `${crit} ${pluralPl(crit, "błąd krytyczny", "błędy krytyczne", "błędów krytycznych")}` };
+    state = { label: t("admin.alerts.state_failure"), color: "#f87171", dot: "#ef4444", live: t("admin.alerts.state_failure_live"),
+      sub: alertsTn("crit_count", crit) };
   } else if (warn > 0) {
-    state = { label: "Wymaga uwagi", color: "#fb923c", dot: "#f97316", live: "Są ostrzeżenia",
-      sub: `${warn} ${pluralPl(warn, "ostrzeżenie", "ostrzeżenia", "ostrzeżeń")}` };
+    state = { label: t("admin.alerts.state_attention"), color: "#fb923c", dot: "#f97316", live: t("admin.alerts.state_attention_live"),
+      sub: alertsTn("warn_count", warn) };
   } else {
-    state = { label: "Stabilny", color: "#34d399", dot: "#10b981", live: "Wszystko działa",
-      sub: info ? `Brak awarii · ${infoText}` : "Brak aktywnych awarii" };
+    state = { label: t("admin.alerts.state_stable"), color: "#34d399", dot: "#10b981", live: t("admin.alerts.state_stable_live"),
+      sub: info ? t("admin.alerts.no_failures_info", { info: infoText }) : t("admin.alerts.no_failures") };
   }
   if (statusEl) { statusEl.textContent = state.label; statusEl.style.color = state.color; }
   if (subStatusEl) subStatusEl.textContent = state.sub;
@@ -429,14 +443,14 @@ function updateKPI(data) {
     totalEl.textContent = String(summary.total || 0);
     totalEl.style.color = crit > 0 ? "#f87171" : warn > 0 ? "#fbbf24" : "inherit";
   }
-  if (subTotalEl) subTotalEl.textContent = `${crit} krytycznych, ${warn} ostrzeżeń, ${info} ${pluralPl(info, "informacja", "informacje", "informacji")}`;
+  if (subTotalEl) subTotalEl.textContent = [alertsTn("crit_short", crit), alertsTn("warn_count", warn), alertsTn("info_count", info)].join(", ");
 
   const runEl = document.querySelector("#valAlertsRunning");
   const totalContEl = document.querySelector("#subAlertsTotalCont");
   if (runEl) runEl.textContent = `${summary.containersRunning ?? "—"} / ${summary.containersTotal ?? "—"}`;
   if (totalContEl) {
     const diff = (summary.containersTotal || 0) - (summary.containersRunning || 0);
-    totalContEl.textContent = diff > 0 ? `Zatrzymanych: ${diff}` : "Wszystkie aktywne";
+    totalContEl.textContent = diff > 0 ? t("admin.alerts.containers_stopped", { n: diff }) : t("admin.alerts.containers_all_active");
   }
 }
 
@@ -446,7 +460,7 @@ function renderIncidents(alerts) {
   if (!container) return;
 
   if (badge) {
-    badge.textContent = `${alerts.length} ${alerts.length === 1 ? "zgłoszenie" : "zgłoszeń"}`;
+    badge.textContent = alertsTn("incidents_count", alerts.length);
     badge.style.borderColor = alerts.length > 0 ? "rgba(239,68,68,0.4)" : "var(--line)";
     badge.style.color = alerts.length > 0 ? "#f87171" : "var(--muted)";
   }
@@ -455,8 +469,8 @@ function renderIncidents(alerts) {
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; border-radius: 12px; background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.25);">
         <span style="margin-bottom: 6px; color: #34d399;">${uiIcon("ok", 34)}</span>
-        <strong style="color: #34d399; font-size: var(--alerts-wyniki);">Wszystkie usługi i kontenery działają prawidłowo.</strong>
-        <p style="color: var(--muted); font-size: var(--alerts-wyniki); margin: 4px 0 0;">Brak aktywnych incydentów w środowisku Homelab.</p>
+        <strong style="color: #34d399; font-size: var(--alerts-wyniki);">${alertsT("all_ok")}</strong>
+        <p style="color: var(--muted); font-size: var(--alerts-wyniki); margin: 4px 0 0;">${alertsT("no_incidents")}</p>
       </div>
     `;
     return;
@@ -468,14 +482,15 @@ function renderIncidents(alerts) {
     const level = isCritical ? "critical" : isInfo ? "info" : "warning";
     // Informacja o aktualizacjach prowadzi do zakładki Aktualizacje, nie do logów.
     const action = a.type === "updates"
-      ? `<button type="button" class="incident-bar-btn" onclick="switchTab('apps')">${uiIcon("package", 14)} Aplikacje</button>`
-      : a.resource ? `<button type="button" class="incident-bar-btn" onclick="showContainerLogs('${escapeHtml(a.resource)}')">${uiIcon("logs", 14)} Logi</button>` : "";
+      ? `<button type="button" class="incident-bar-btn" onclick="switchTab('apps')">${uiIcon("package", 14)} ${alertsT("action_apps")}</button>`
+      : a.resource ? `<button type="button" class="incident-bar-btn" onclick="showContainerLogs('${escapeHtml(a.resource)}')">${uiIcon("logs", 14)} ${alertsT("action_logs")}</button>` : "";
+    const text = serverAlertText(a, "admin.alerts");
     return `
       <div class="incident-bar ${level}">
         <span class="incident-bar-icon">${uiIcon(isCritical ? "siren" : isInfo ? "package" : "warning", 24)}</span>
         <div class="incident-bar-text">
-          <strong>${escapeHtml(a.title)}</strong>
-          <span>${escapeHtml(a.message)}</span>
+          <strong>${escapeHtml(text.title)}</strong>
+          <span>${escapeHtml(text.message)}</span>
         </div>
         ${action}
       </div>
@@ -495,7 +510,7 @@ function renderContainersGrid(containers) {
   }
 
   if (filtered.length === 0) {
-    grid.innerHTML = '<div class="empty" style="grid-column: 1 / -1;">Brak kontenerów spełniających kryteria filtra.</div>';
+    grid.innerHTML = `<div class="empty" style="grid-column: 1 / -1;">${alertsT("containers_none")}</div>`;
     return;
   }
 
@@ -514,7 +529,7 @@ function renderContainersGrid(containers) {
           </span>
         </div>
         <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
-          <button type="button" class="button" onclick="showContainerLogs('${escapeHtml(containerName)}')" style="padding: 3px 8px; font-size: var(--alerts-wyniki);">${uiIcon("logs", 13)} Logi</button>
+          <button type="button" class="button" onclick="showContainerLogs('${escapeHtml(containerName)}')" style="padding: 3px 8px; font-size: var(--alerts-wyniki);">${uiIcon("logs", 13)} ${alertsT("action_logs")}</button>
         </div>
       </div>
     `;
@@ -536,15 +551,15 @@ async function showContainerLogs(name) {
   if (!dialog || !content) return;
 
   const cleanName = name.replace(/^\//, "");
-  if (title) title.textContent = `Logi kontenera: ${cleanName}`;
-  content.textContent = `Pobieranie logów kontenera: ${cleanName}...`;
+  if (title) title.textContent = t("admin.logs.title_container", { name: cleanName });
+  content.textContent = t("admin.logs.loading", { name: cleanName });
   dialog.showModal();
 
   try {
     const res = await request(`/api/docker/container/${encodeURIComponent(cleanName)}/logs`);
-    content.textContent = stripAnsi(res.logs) || "Brak dostępnych logów.";
+    content.textContent = stripAnsi(res.logs) || t("admin.logs.empty");
   } catch (err) {
-    content.textContent = `Błąd pobierania logów: ${err.message}`;
+    content.textContent = t("admin.logs.error", { message: err.message });
   }
 }
 

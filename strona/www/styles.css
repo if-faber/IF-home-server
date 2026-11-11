@@ -598,10 +598,6 @@ dialog menu { display: flex; justify-content: flex-end; gap: 8px; margin: 4px 0 
 .appearance-grid input[type="color"] { width: 100%; padding: 5px; }
 .appearance-grid input[type="range"] { padding: 0; }
 .appearance-grid label > span:not(.info-tip):not(.field-title) { position: absolute; right: 0; top: 0; color: var(--accent); font-size: 11px; }
-.command-list { display: grid; gap: 10px; }
-.command-list article { display: grid; gap: 7px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgb(255 255 255 / 0.045); }
-.command-list strong { color: var(--text); font-size: 13px; }
-.command-list code { display: block; overflow-x: auto; padding: 10px; border-radius: 10px; background: rgb(0 0 0 / 0.22); color: var(--accent); font-size: 12px; white-space: nowrap; }
 .toast { position: fixed; right: 18px; bottom: 18px; z-index: 10; padding: 12px 15px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-strong); color: var(--accent); opacity: 0; transform: translateY(12px); transition: .2s ease; pointer-events: none; }
 .toast.visible { opacity: 1; transform: translateY(0); }
 .startup-error {
@@ -632,8 +628,10 @@ dialog menu { display: flex; justify-content: flex-end; gap: 8px; margin: 4px 0 
 @media (max-width: 700px) {
   .main { padding: 16px; }
   .sidebar-hidden .main { padding-left: 16px; padding-right: 16px; padding-top: 72px; }
-  .toolbar { align-items: stretch; flex-direction: column; }
-  .header-stats { min-width: 0; justify-content: stretch; }
+  /* Bez zawijania i bez „100%” z układu tabletu — inaczej CPU/RAM przeskakują do drugiej kolumny,
+     poza ekran (pomiar na telefonie Darka 11.11.2026: kafelki 379–526 px przy ekranie 376 px). */
+  .toolbar { align-items: stretch; flex-direction: column; flex-wrap: nowrap; }
+  .header-stats { min-width: 0; justify-content: stretch; flex-basis: auto; }
   .header-stat { flex: 1; min-width: 0; }
   .toolbar-actions { justify-content: stretch; }
   .toolbar-actions > * { flex: 1; }

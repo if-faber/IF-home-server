@@ -18,7 +18,7 @@ sprawdz() {
     if [ -x /usr/local/bin/if-aplikacje ] \
         && ! cmp -s "$APP_DIR/strona/extras/aplikacje/if-aplikacje" /usr/local/bin/if-aplikacje; then
         brak="${brak:+$brak
-}nowa wersja zadania if-aplikacje"
+}$(t 'nowa wersja zadania %s' if-aplikacje)"
     fi
     [ -z "$brak" ] || printf '%s\n' "$brak"
 }

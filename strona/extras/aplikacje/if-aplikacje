@@ -41,7 +41,15 @@ NAZWA_APLIKACJI = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
 
 
 class Blad(Exception):
-    """Błąd z komunikatem dla człowieka (trafia na stronę)."""
+    """Błąd z komunikatem dla człowieka (trafia na stronę).
+
+    kod i zmienne — dla tłumaczeń (plan „Język”, Darek 11.11.2026): strona dobiera tekst po kodzie,
+    polski tekst zostaje jako zapas."""
+
+    def __init__(self, tekst, kod=None, **zmienne):
+        super().__init__(tekst)
+        self.kod = kod
+        self.zmienne = zmienne
 
 
 def teraz():
@@ -93,12 +101,12 @@ def oddaj(sciezka, uid, gid):
 def zaloz(config, zlecenie):
     nazwa = str(zlecenie.get("nazwa") or "")
     if not NAZWA_APLIKACJI.match(nazwa):
-        raise Blad("Niepoprawna nazwa aplikacji.")
+        raise Blad("Niepoprawna nazwa aplikacji.", "bad_name")
     dom, uid, gid = wlasciciel(config)
     folder_app = os.path.join(dom, "docker", "app", nazwa)
     folder_danych = os.path.join(dom, "docker", "app-data", nazwa)
     if os.path.exists(folder_app):
-        raise Blad(f"Aplikacja „{nazwa}” już jest na serwerze (folder app/{nazwa}). Niczego nie zmieniam.")
+        raise Blad(f"Aplikacja „{nazwa}” już jest na serwerze (folder app/{nazwa}). Niczego nie zmieniam.", "app_exists", nazwa=nazwa)
 
     compose = str(zlecenie.get("compose") or "")
     env = str(zlecenie.get("env") or "")
@@ -124,7 +132,7 @@ def zaloz(config, zlecenie):
         if wynik.returncode != 0:
             opis = (wynik.stderr or wynik.stdout).strip().splitlines()
             ostatnia = (opis[-1] if opis else "nieznany błąd").replace(tymczasowy + os.sep, "")
-            raise Blad("Docker nie przyjął compose: " + ostatnia)
+            raise Blad("Docker nie przyjął compose: " + ostatnia, "compose_rejected", opis=ostatnia)
         konfiguracja = json.loads(wynik.stdout or "{}")
         foldery = set()
         for usluga in (konfiguracja.get("services") or {}).values():
@@ -165,18 +173,19 @@ SPOKOJ_S = 20                    # kontener bez healthchecka: musi działać tyl
 
 
 def stan_aktualizacji(config, **pola):
+    # etap_kod / etap_zmienne — dla tłumaczeń; „etap” po polsku zostaje.
     plik = os.path.join(config, "aplikacje-stan.json")
     stan = czytaj_json(plik) or {}
     stan.update(pola)
     zapisz_json(plik, stan)
 
 
-def zlecenie_kopii(config, zlecenie, opis):
+def zlecenie_kopii(config, zlecenie, opis, rodzaj):
     """Zleca pracę zadaniu kopii zapasowej (jak strona) i czeka na wynik; zwraca stan kopii."""
     plik = os.path.join(config, "backup-zlecenie.json")
     stan_plik = os.path.join(config, "backup-stan.json")
     if (czytaj_json(stan_plik) or {}).get("stan") == "trwa" or os.path.exists(plik):
-        raise Blad("Trwa kopia zapasowa albo przywracanie — spróbuj po jej zakończeniu.")
+        raise Blad("Trwa kopia zapasowa albo przywracanie — spróbuj po jej zakończeniu.", "backup_busy")
     start = time.time()
     zapisz_json(plik, {**zlecenie, "zlecono": teraz()})
     while time.time() - start < CZAS_KOPII_S:
@@ -185,14 +194,14 @@ def zlecenie_kopii(config, zlecenie, opis):
         if os.path.exists(plik):
             if time.time() - start > 60:
                 os.remove(plik)
-                raise Blad("Zadanie kopii zapasowej nie odpowiada (if-backup). W terminalu serwera: sudo if-server → Upgrade.")
+                raise Blad("Zadanie kopii zapasowej nie odpowiada (if-backup). W terminalu serwera: sudo if-server → Upgrade.", "backup_no_answer")
             continue
         if stan.get("stan") in ("gotowa", "blad") and stan.get("koniec") and \
                 datetime.fromisoformat(stan["koniec"]).timestamp() >= start - 1:
             if stan["stan"] == "blad":
-                raise Blad(f"{opis} nie udała się: {stan.get('komunikat') or 'nieznany błąd'}")
+                raise Blad(f"{opis} nie udała się: {stan.get('komunikat') or 'nieznany błąd'}", f"{rodzaj}_failed", blad=stan.get("komunikat") or "")
             return stan
-    raise Blad(f"{opis} trwa zbyt długo — przerwałem czekanie.")
+    raise Blad(f"{opis} trwa zbyt długo — przerwałem czekanie.", f"{rodzaj}_timeout")
 
 
 def compose_ps(folder, plik):
@@ -209,7 +218,7 @@ def compose_ps(folder, plik):
 
 
 def czy_dziala(folder, plik):
-    """Czeka, aż wszystkie kontenery stosu działają; zwraca (True, "") albo (False, opis)."""
+    """Czeka, aż wszystkie kontenery stosu działają; zwraca (True, "", {}) albo (False, opis, części opisu)."""
     start = time.time()
     spokojnie_od = None
     restart_od = None
@@ -227,17 +236,19 @@ def czy_dziala(folder, plik):
                or (restart_od and time.time() - restart_od >= 30 and k.get("State") == "restarting")]
         if zle:
             k = zle[0]
-            return False, f"{k.get('Name')}: {k.get('Status') or k.get('State')}"
+            opis = f"{k.get('Name')}: {k.get('Status') or k.get('State')}"
+            return False, opis, {"powod": opis}
         gotowe = all(k.get("State") == "running" and k.get("Health") in ("", None, "healthy") for k in kontenery)
         if gotowe:
             spokojnie_od = spokojnie_od or time.time()
             if time.time() - spokojnie_od >= SPOKOJ_S:
-                return True, ""
+                return True, "", {}
         else:
             spokojnie_od = None
     kontenery = compose_ps(folder, plik)
     opis = ", ".join(f"{k.get('Name')}: {k.get('Status') or k.get('State')}" for k in kontenery) or "brak kontenerów"
-    return False, f"aplikacja nie wstała w ciągu {CZAS_STARTU_S // 60} min ({opis})"
+    return False, f"aplikacja nie wstała w ciągu {CZAS_STARTU_S // 60} min ({opis})", \
+        {"powod_kod": "start_timeout", "minuty": CZAS_STARTU_S // 60, "lista": opis if kontenery else ""}
 
 
 def compose_up(folder, plik, *dodatkowe):
@@ -245,45 +256,45 @@ def compose_up(folder, plik, *dodatkowe):
                            cwd=folder, capture_output=True, text=True, timeout=1800)
     if wynik.returncode != 0:
         opis = (wynik.stderr or wynik.stdout).strip().splitlines()
-        raise Blad(opis[-1] if opis else "nieznany błąd Dockera")
+        raise Blad(opis[-1] if opis else "nieznany błąd Dockera", "docker_error", opis=opis[-1] if opis else "")
 
 
 def aktualizuj(config, zlecenie):
     stos = str(zlecenie.get("stos") or "")
     if not NAZWA_APLIKACJI.match(stos):
-        raise Blad("Niepoprawna nazwa aplikacji.")
+        raise Blad("Niepoprawna nazwa aplikacji.", "bad_name")
     dom, uid, gid = wlasciciel(config)
     folder = os.path.join(dom, "docker", "app", stos)
     plik = next((os.path.join(folder, n) for n in ("compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml")
                  if os.path.isfile(os.path.join(folder, n))), None)
     if not plik:
-        raise Blad(f"Nie znaleziono pliku compose aplikacji „{stos}”.")
+        raise Blad(f"Nie znaleziono pliku compose aplikacji „{stos}”.", "compose_missing", stos=stos)
     nowy = str(zlecenie.get("compose") or "")
     wersja = str(zlecenie.get("tag") or "")
     if "services" not in nowy:
-        raise Blad("Strona nie podała nowego compose.")
+        raise Blad("Strona nie podała nowego compose.", "no_new_compose")
 
     # 1. Pobranie nowej wersji z compose obok (aplikacja działa dalej). Nie da się — nic nie zmieniamy.
-    stan_aktualizacji(config, etap=f"Pobieranie wersji {wersja}", procent=10)
+    stan_aktualizacji(config, etap=f"Pobieranie wersji {wersja}", etap_kod="pull", etap_zmienne={"wersja": wersja}, procent=10)
     nowy_plik = os.path.join(folder, ".if-compose-nowy.yaml")
     with open(nowy_plik, "w", encoding="utf-8") as f:
         f.write(nowy)
     try:
         compose_up(folder, nowy_plik, "pull")
     except Blad as e:
-        raise Blad(f"Nie udało się pobrać nowej wersji ({e}). Nic nie zmieniłem — aplikacja działa jak dotąd.")
+        raise Blad(f"Nie udało się pobrać nowej wersji ({e}). Nic nie zmieniłem — aplikacja działa jak dotąd.", "pull_failed", blad=str(e))
     finally:
         os.remove(nowy_plik)
 
     # 2. Kopia tej aplikacji (jeśli kopia zapasowa jest ustawiona i użytkownik jej nie wyłączył).
     kopia = None
     if zlecenie.get("kopia"):
-        stan_aktualizacji(config, etap="Kopia zapasowa aplikacji", procent=30)
-        kopia = zlecenie_kopii(config, {"akcja": "kopia", "aplikacja": stos}, "Kopia aplikacji przed aktualizacją")
+        stan_aktualizacji(config, etap="Kopia zapasowa aplikacji", etap_kod="backup", etap_zmienne={}, procent=30)
+        kopia = zlecenie_kopii(config, {"akcja": "kopia", "aplikacja": stos}, "Kopia aplikacji przed aktualizacją", "backup")
         kopia = (kopia.get("ostatnia") or {}).get("folder")
 
     # 2. Nowy compose; stary odłożony jak przy „Aktualizuj compose” (działa też „Cofnij”).
-    stan_aktualizacji(config, etap="Zapis nowej wersji", procent=40)
+    stan_aktualizacji(config, etap="Zapis nowej wersji", etap_kod="save", etap_zmienne={}, procent=40)
     with open(plik, encoding="utf-8") as f:
         stary = f.read()
     kopie_compose = os.path.join(folder, "backup")
@@ -296,34 +307,38 @@ def aktualizuj(config, zlecenie):
     with open(plik, "w", encoding="utf-8") as f:
         f.write(nowy)
 
-    def przywroc_stary(powod):
-        stan_aktualizacji(config, etap="Powrót do poprzedniej wersji", procent=85)
+    def przywroc_stary(powod, czesci=None):
+        czesci = czesci or {"powod": powod}
+        stan_aktualizacji(config, etap="Powrót do poprzedniej wersji", etap_kod="rollback", etap_zmienne={}, procent=85)
         with open(plik, "w", encoding="utf-8") as f:
             f.write(stary)
         dane = ""
         if kopia:
-            stan_aktualizacji(config, etap="Przywracanie danych z kopii", procent=90)
-            zlecenie_kopii(config, {"akcja": "przywroc", "kopia": kopia, "aplikacja": stos}, "Przywracanie danych")
+            stan_aktualizacji(config, etap="Przywracanie danych z kopii", etap_kod="restore", etap_zmienne={}, procent=90)
+            zlecenie_kopii(config, {"akcja": "przywroc", "kopia": kopia, "aplikacja": stos}, "Przywracanie danych", "restore")
             dane = f" i dane z kopii {kopia}"
         # Kontenery od nowa z poprzedniego compose (samo uruchomienie zostawiłoby nową wersję).
         compose_up(folder, plik, "up", "-d", "--force-recreate")
-        dziala, opis = czy_dziala(folder, plik)
+        dziala, opis, czesci_po = czy_dziala(folder, plik)
         if not dziala:
-            raise Blad(f"Nowa wersja nie działa ({powod}), a po powrocie do poprzedniej wersji{dane} aplikacja też nie wstała ({opis}). Sprawdź ją w Dockge.")
-        raise Blad(f"Nowa wersja nie działa ({powod}). Przywróciłem poprzednią wersję{dane} — aplikacja działa jak przed aktualizacją.")
+            raise Blad(f"Nowa wersja nie działa ({powod}), a po powrocie do poprzedniej wersji{dane} aplikacja też nie wstała ({opis}). Sprawdź ją w Dockge.",
+                       "rollback_failed_backup" if kopia else "rollback_failed", kopia=kopia or "", **czesci,
+                       po={k: v for k, v in czesci_po.items()})
+        raise Blad(f"Nowa wersja nie działa ({powod}). Przywróciłem poprzednią wersję{dane} — aplikacja działa jak przed aktualizacją.",
+                   "rolled_back_backup" if kopia else "rolled_back", kopia=kopia or "", **czesci)
 
     # 3. Uruchomienie nowej wersji.
-    stan_aktualizacji(config, etap="Uruchamianie nowej wersji", procent=70)
+    stan_aktualizacji(config, etap="Uruchamianie nowej wersji", etap_kod="start", etap_zmienne={}, procent=70)
     try:
         compose_up(folder, plik, "up", "-d")
     except Blad as e:
         przywroc_stary(str(e))
 
     # 4. Czy działa?
-    stan_aktualizacji(config, etap="Sprawdzanie, czy aplikacja działa", procent=80)
-    dziala, opis = czy_dziala(folder, plik)
+    stan_aktualizacji(config, etap="Sprawdzanie, czy aplikacja działa", etap_kod="check", etap_zmienne={}, procent=80)
+    dziala, opis, czesci = czy_dziala(folder, plik)
     if not dziala:
-        przywroc_stary(opis)
+        przywroc_stary(opis, czesci)
     return kopia
 
 
@@ -343,29 +358,36 @@ def obsluz(config):
             foldery = zaloz(config, zlecenie)
             zapisz_json(stan_plik, {
                 "stan": "gotowe", "nazwa": nazwa, "foldery": foldery, "czas": teraz(),
-                "komunikat": f"Aplikacja „{nazwa}” jest przygotowana: compose w app/{nazwa}, dane w app-data/{nazwa}. Uruchom ją w Dockge („Deploy”)."})
+                "komunikat": f"Aplikacja „{nazwa}” jest przygotowana: compose w app/{nazwa}, dane w app-data/{nazwa}. Uruchom ją w Dockge („Deploy”).",
+                "komunikat_kod": "app_ready", "zmienne": {"nazwa": nazwa}})
         except Blad as e:
-            zapisz_json(stan_plik, {"stan": "blad", "nazwa": nazwa, "komunikat": str(e), "czas": teraz()})
+            zapisz_json(stan_plik, {"stan": "blad", "nazwa": nazwa, "komunikat": str(e), "czas": teraz(),
+                                    "komunikat_kod": e.kod, "zmienne": e.zmienne})
         except Exception as e:  # nieoczekiwany błąd — opis na stronę, szczegóły w dzienniku
             print(f"if-aplikacje: {e!r}", file=sys.stderr)
             zapisz_json(stan_plik, {"stan": "blad", "nazwa": nazwa, "czas": teraz(),
-                                    "komunikat": f"Nieoczekiwany błąd: {e}. Szczegóły: journalctl -u if-aplikacje"})
+                                    "komunikat": f"Nieoczekiwany błąd: {e}. Szczegóły: journalctl -u if-aplikacje",
+                                    "komunikat_kod": "unexpected", "zmienne": {"blad": str(e)}})
     elif akcja == "aktualizuj":
         stos = zlecenie.get("stos")
         stan_aktualizacji(config, stan="trwa", rodzaj="aktualizacja", nazwa=stos, procent=5,
-                          etap="Przygotowanie", komunikat="", czas=teraz())
+                          etap="Przygotowanie", etap_kod="prepare", etap_zmienne={}, komunikat="", czas=teraz())
         try:
             kopia = aktualizuj(config, zlecenie)
             zapisz_json(stan_plik, {
-                "stan": "gotowe", "rodzaj": "aktualizacja", "nazwa": stos, "procent": 100, "etap": "Gotowe", "czas": teraz(),
+                "stan": "gotowe", "rodzaj": "aktualizacja", "nazwa": stos, "procent": 100, "etap": "Gotowe", "etap_kod": "done", "czas": teraz(),
                 "komunikat": f"Aplikacja „{stos}” działa w wersji {zlecenie.get('tag')}."
-                             + (f" Kopia sprzed aktualizacji: {kopia}." if kopia else "")})
+                             + (f" Kopia sprzed aktualizacji: {kopia}." if kopia else ""),
+                "komunikat_kod": "updated_backup" if kopia else "updated",
+                "zmienne": {"nazwa": stos, "wersja": zlecenie.get("tag") or "", "kopia": kopia or ""}})
         except Blad as e:
-            zapisz_json(stan_plik, {"stan": "blad", "rodzaj": "aktualizacja", "nazwa": stos, "komunikat": str(e), "czas": teraz()})
+            zapisz_json(stan_plik, {"stan": "blad", "rodzaj": "aktualizacja", "nazwa": stos, "komunikat": str(e), "czas": teraz(),
+                                    "komunikat_kod": e.kod, "zmienne": e.zmienne})
         except Exception as e:  # nieoczekiwany błąd — opis na stronę, szczegóły w dzienniku
             print(f"if-aplikacje: {e!r}", file=sys.stderr)
             zapisz_json(stan_plik, {"stan": "blad", "rodzaj": "aktualizacja", "nazwa": stos, "czas": teraz(),
-                                    "komunikat": f"Nieoczekiwany błąd: {e}. Szczegóły: journalctl -u if-aplikacje"})
+                                    "komunikat": f"Nieoczekiwany błąd: {e}. Szczegóły: journalctl -u if-aplikacje",
+                                    "komunikat_kod": "unexpected", "zmienne": {"blad": str(e)}})
     elif akcja:
         print(f"if-aplikacje: nieznana akcja „{akcja}”", file=sys.stderr)
 

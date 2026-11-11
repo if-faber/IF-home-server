@@ -255,6 +255,7 @@ T['IF-startpage (strona startowa)']='IF-startpage (start page)'
 T['działający kontener if-startpage']='running if-startpage container'
 T['strona zapisuje dane w złym folderze (/home/{user}) — przeniesienie']='the page saves data in the wrong folder (/home/{user}) — moving'
 T['nowa wersja strony: %s (jest %s)']='new page version: %s (installed %s)'
+T['nowa wersja zadania %s']='new version of the %s task'
 T['Strona startowa (IF-startpage)']='Start page (IF-startpage)'
 T['Przenieś']='Move'
 T['Strona startowa zapisuje dane w złym folderze:

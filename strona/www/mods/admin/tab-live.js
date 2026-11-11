@@ -10,8 +10,8 @@ function renderLiveTab() {
       <section class="admin-section-card">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
           <div>
-            <h2>${uiIcon("status", 22)} Statystyki Live</h2>
-            <p class="settings-note">Szczegółowa diagnostyka serwera na żywo — obciążenie CPU per rdzeń, temperatury, pamięć RAM, dyski, ruch sieciowy, procesy kontenera IF-startpage i kontenery Docker. Dane odświeżają się automatycznie co 2,5 s.</p>
+            <h2>${uiIcon("status", 22)} ${escapeHtml(t("admin.live.title"))}</h2>
+            <p class="settings-note">${escapeHtml(t("admin.live.intro"))}</p>
           </div>
         </div>
         <div id="liveStatsMount"></div>
@@ -24,7 +24,7 @@ function bindLiveEvents() {
   const mount = document.querySelector("#liveStatsMount");
   if (!mount || typeof TopDiagnostics === "undefined") return;
 
-  const controller = TopDiagnostics.mount(mount, { title: "Statystyki Live", withTemperatures: true });
+  const controller = TopDiagnostics.mount(mount, { title: t("admin.live.title"), withTemperatures: true, section: "admin.live" });
   controller.start();
 
   // switchTab() w admin.js woła to przy zmianie zakładki, żeby zatrzymać

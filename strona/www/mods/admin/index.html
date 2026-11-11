@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Zaplecze — IF-startpage</title>
+    <title data-t="admin.sidebar.page_title">Zaplecze — IF-startpage</title>
     <link rel="icon" type="image/png" href="/images/favicon.png">
     <link rel="shortcut icon" href="/images/favicon.png">
     <script>
@@ -11,81 +11,70 @@
       try { document.documentElement.dataset.mode = localStorage.getItem("ifs.mode") === "d" ? "d" : "n"; }
       catch (e) { document.documentElement.dataset.mode = "n"; }
     </script>
-    <link rel="stylesheet" href="../../styles.css?v=0.4.2">
-    <link rel="stylesheet" href="./admin.css?v=0.4.1">
+    <link rel="stylesheet" href="../../styles.css?v=0.5-m1">
+    <link rel="stylesheet" href="./admin.css?v=0.5-f1">
     <link rel="stylesheet" href="../top/top.css?v=0.3.6c">
     <!-- Modułowa architektura Zaplecza IF-startpage (mods/admin) -->
-    <script src="../../ui-icons.js?v=0.3.5" defer></script>
-    <script src="../../shared.js?v=0.4.2" defer></script>
-    <script src="../top/top.js?v=0.3.6c" defer></script>
-    <script src="./secure.js?v=0.4.2" defer></script>
-    <script src="./tab-helper.js?v=0.3.7a" defer></script>
-    <script src="./tab-alerts.js?v=0.3.6a" defer></script>
-    <script src="./tab-live.js?v=0.4.2" defer></script>
-    <script src="./tab-homepage.js?v=0.4.2i" defer></script>
-    <script src="./tab-modules.js?v=0.3.6" defer></script>
+    <!-- Rdzeń tłumaczeń: napisy wybranego języka (z serwera), potem funkcja t(). Przed resztą skryptów. -->
+    <script src="/lang.js" defer></script>
+    <script src="../../i18n.js" defer></script>
+    <!-- Wspólne okienka (ui-icons.js) biorą w Zapleczu napisy z sekcji komunikatów Zaplecza. -->
+    <script>window.IF_MESSAGES_SECTION = "admin.messages";</script>
+    <script src="../../ui-icons.js?v=0.5-f1" defer></script>
+    <script src="../../shared.js?v=0.5-t8" defer></script>
+    <script src="../top/top.js?v=0.5-f1" defer></script>
+    <script src="./secure.js?v=0.5-t2" defer></script>
+    <script src="./tab-helper.js?v=0.5-f1" defer></script>
+    <script src="./tab-alerts.js?v=0.5-f1" defer></script>
+    <script src="./tab-live.js?v=0.5-t8" defer></script>
+    <script src="./tab-homepage.js?v=0.5-t7" defer></script>
+    <script src="./tab-modules.js?v=0.5-t2" defer></script>
     <script src="./tab-kiosk.js?v=0.4.2c" defer></script>
-    <script src="./tab-ports.js?v=0.3.6" defer></script>
-    <script src="./tab-apps.js?v=0.4.1" defer></script>
-    <script src="./tab-backup.js?v=0.3.6" defer></script>
-    <script src="./tab-admin-theme.js?v=0.4.2c" defer></script>
-    <script src="./admin.js?v=0.3.6a" defer></script>
+    <script src="./tab-ports.js?v=0.5-t2" defer></script>
+    <script src="./tab-apps.js?v=0.5-f1" defer></script>
+    <script src="./tab-backup.js?v=0.5-f1" defer></script>
+    <script src="./tab-admin-theme.js?v=0.5-t1" defer></script>
+    <script src="./admin.js?v=0.5-t12" defer></script>
   </head>
   <body class="theme-nas admin-body">
     <div id="adminApp">
-      <!-- PIN Screen -->
-      <div id="pinScreen" class="admin-lock-screen">
-        <form id="adminPinForm" class="modal-panel" autocomplete="off">
-          <header class="modal-heading">
-            <div>
-              <span class="eyebrow">Autoryzacja</span>
-              <h2>Dostęp administracyjny</h2>
-            </div>
-          </header>
-          <label>
-            Kod PIN
-            <input id="adminPinInput" type="password" inputmode="numeric" autocomplete="new-password" placeholder="Wpisz PIN" required autofocus>
-          </label>
-          <menu>
-            <a href="../../" class="button">Wróć do serwisu</a>
-            <button class="button primary" type="submit">Odblokuj</button>
-          </menu>
-        </form>
-      </div>
+      <!-- PIN: to samo małe okienko co na stronie głównej (ui-icons.js → pinDialogHtml, wstawiane w admin.js). -->
 
       <!-- Main Admin Dashboard Panel -->
       <div id="adminDashboard" class="admin-layout" style="display: none;">
+        <!-- ☰ chowanie menu, jak na stronie głównej; na telefonie menu jest schowane, ☰ je otwiera (Darek 11.11.2026). -->
+        <button class="menu-toggle" id="adminMenuToggle" type="button" title="Pokaż lub ukryj menu" aria-label="Pokaż lub ukryj menu" data-t-title="admin.sidebar.menu_toggle" data-t-aria="admin.sidebar.menu_toggle"></button>
         <!-- Left Sidebar Navigation -->
         <aside class="admin-sidebar">
           <div class="brand">
             <div>
-              <strong style="font-size: 16px; letter-spacing: -0.02em;">Zaplecze</strong>
-              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">Ustawienia &amp; Wygląd <span id="adminAppVersion" class="admin-app-version"></span></p>
+              <strong style="font-size: 16px; letter-spacing: -0.02em;" data-t="admin.sidebar.brand">Zaplecze</strong>
+              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;"><span data-t="admin.sidebar.brand_sub">Ustawienia &amp; Wygląd</span> <span id="adminAppVersion" class="admin-app-version"></span></p>
             </div>
           </div>
 
           <nav class="admin-nav" style="margin-top: 20px;">
             <!-- Kolejność: treść strony → stan serwera → ustawienia (od najczęściej używanych). -->
-            <div class="admin-nav-group">Treść strony</div>
-            <button class="nav-button active" id="tab-homepage" type="button" data-icon="page">Strony i sekcje</button>
-            <div class="admin-nav-group">Serwer</div>
-            <button class="nav-button" id="tab-alerts" type="button" data-icon="alerts">Centrum Alertów</button>
-            <button class="nav-button" id="tab-live" type="button" data-icon="status">Statystyki Live</button>
-            <button class="nav-button" id="tab-apps" type="button" data-icon="package">Aplikacje</button>
-            <button class="nav-button" id="tab-backup" type="button" data-icon="save">Kopia zapasowa</button>
-            <div class="admin-nav-group">Ustawienia</div>
+            <div class="admin-nav-group" data-t="admin.sidebar.group_content">Treść strony</div>
+            <button class="nav-button active" id="tab-homepage" type="button" data-icon="page"><span data-t="admin.sidebar.nav_homepage">Strony i sekcje</span></button>
+            <div class="admin-nav-group" data-t="admin.sidebar.group_server">Serwer</div>
+            <button class="nav-button" id="tab-alerts" type="button" data-icon="alerts"><span data-t="admin.sidebar.nav_alerts">Centrum Alertów</span></button>
+            <button class="nav-button" id="tab-live" type="button" data-icon="status"><span data-t="admin.sidebar.nav_live">Statystyki Live</span></button>
+            <button class="nav-button" id="tab-apps" type="button" data-icon="package"><span data-t="admin.sidebar.nav_apps">Aplikacje</span></button>
+            <button class="nav-button" id="tab-backup" type="button" data-icon="save"><span data-t="admin.sidebar.nav_backup">Kopia zapasowa</span></button>
+            <div class="admin-nav-group" data-t="admin.sidebar.group_settings">Ustawienia</div>
             <!-- tab-kiosk: od v0.4.2 dostępny przez hub "Moduły" (tab-modules.js), bez własnego przycisku w sidebarze -->
-            <button class="nav-button" id="tab-modules" type="button" data-icon="modules">Moduły</button>
-            <button class="nav-button" id="tab-admin-theme" type="button" data-icon="appearance">Wygląd Zaplecza</button>
-            <button class="nav-button" id="tab-helper" type="button" data-icon="settings">Ustawienia ogólne</button>
+            <button class="nav-button" id="tab-modules" type="button" data-icon="modules"><span data-t="admin.sidebar.nav_modules">Moduły</span></button>
+            <button class="nav-button" id="tab-admin-theme" type="button" data-icon="appearance"><span data-t="admin.sidebar.nav_admin_theme">Wygląd Zaplecza</span></button>
+            <button class="nav-button" id="tab-helper" type="button" data-icon="settings"><span data-t="admin.sidebar.nav_general">Ustawienia ogólne</span></button>
           </nav>
 
-          <!-- Stopka menu jak na Stronie Głównej: trzy ikonki (tryb dzień/noc, powrót, wylogowanie). -->
+          <!-- Stopka menu jak na Stronie Głównej: trzy ikonki (tryb dzień/noc, „Wróć do strony” — bez wylogowania, „Wyloguj”). -->
           <div class="sidebar-actions admin-sidebar-footer">
             <div class="sidebar-tools">
-              <button type="button" class="sidebar-icon-btn" id="adminModeToggle" title="Tryb dzień / noc" aria-label="Przełącz tryb dzień / noc"></button>
-              <a href="../../" class="sidebar-icon-btn" title="Powrót do serwisu" aria-label="Powrót do serwisu" data-icon="back"></a>
-              <button type="button" class="sidebar-icon-btn admin-logout-btn" onclick="logoutAdmin()" title="Wyloguj z Zaplecza" aria-label="Wyloguj z Zaplecza" data-icon="logout"></button>
+              <button type="button" class="sidebar-icon-btn" id="adminModeToggle" title="Tryb dzień / noc" aria-label="Przełącz tryb dzień / noc" data-t-title="admin.sidebar.mode_title" data-t-aria="admin.sidebar.mode_label"></button>
+              <a href="../../" class="sidebar-icon-btn" title="Wróć do strony (zostajesz zalogowany)" aria-label="Wróć do strony (zostajesz zalogowany)" data-t-title="admin.sidebar.back" data-t-aria="admin.sidebar.back" data-icon="back"></a>
+              <button type="button" class="sidebar-icon-btn admin-logout-btn" onclick="logoutAdmin()" title="Wyloguj — przy następnym wejściu Zaplecze zapyta o PIN" aria-label="Wyloguj" data-t-title="admin.sidebar.logout_tip" data-t-aria="admin.sidebar.logout" data-icon="logout"></button>
             </div>
           </div>
         </aside>
@@ -94,7 +83,7 @@
         <main class="admin-main">
           <header class="toolbar" style="margin-bottom: 20px;">
             <div class="page-title">
-              <h1 id="tabTitle" style="font-size: 24px; margin: 0;">Strony i sekcje</h1>
+              <h1 id="tabTitle" style="font-size: 24px; margin: 0;" data-t="admin.sidebar.title_homepage">Strony i sekcje</h1>
             </div>
           </header>
           <section id="tabContent" class="admin-content"></section>
@@ -106,43 +95,43 @@
     <dialog id="linkDialogAdmin" class="wide-dialog">
       <form id="linkFormAdmin" class="modal-panel">
         <header class="modal-heading">
-          <div><span class="eyebrow">Zarządzanie</span><h2 id="linkDialogAdminTitle">Nowy link</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
+          <div><span class="eyebrow" data-t="admin.link_dialog.eyebrow">Zarządzanie</span><h2 id="linkDialogAdminTitle" data-t="admin.link_dialog.title_new">Nowy link</h2></div>
+          <button type="button" data-close aria-label="Zamknij" data-t-aria="admin.link_dialog.close">×</button>
         </header>
         <div class="settings-grid">
-          <label>Sekcja<select id="linkSectionAdmin"></select></label>
-          <label>Nazwa<input id="linkNameAdmin" required></label>
-          <label style="grid-column: 1 / -1;">URL<input id="linkUrlAdmin" type="url" required placeholder="https://..."></label>
-          <label style="grid-column: 1 / -1;">Opis<input id="linkDescriptionAdmin"></label>
-          <label>Ikona<input id="linkIconAdmin" placeholder="Plik z folderu icons (immich.png), ikona Lucide (printer), litera albo URL"></label>
-          <label>Otwieranie<select id="linkOpenModeAdmin"><option value="new-tab">Nowa karta</option><option value="iframe">W dashboardzie</option></select></label>
+          <label><span data-t="admin.link_dialog.section">Sekcja</span><select id="linkSectionAdmin"></select></label>
+          <label><span data-t="admin.link_dialog.name">Nazwa</span><input id="linkNameAdmin" required></label>
+          <label style="grid-column: 1 / -1;"><span data-t="admin.link_dialog.url">URL</span><input id="linkUrlAdmin" type="url" required placeholder="https://..."></label>
+          <label style="grid-column: 1 / -1;"><span data-t="admin.link_dialog.description">Opis</span><input id="linkDescriptionAdmin"></label>
+          <label><span data-t="admin.link_dialog.icon">Ikona</span><input id="linkIconAdmin" placeholder="Plik z folderu icons (immich.png), ikona Lucide (printer), litera albo URL" data-t-placeholder="admin.link_dialog.icon_placeholder"></label>
+          <label><span data-t="admin.link_dialog.open_mode">Otwieranie</span><select id="linkOpenModeAdmin"><option value="new-tab" data-t="admin.link_dialog.open_new_tab">Nowa karta</option><option value="iframe" data-t="admin.link_dialog.open_iframe">W dashboardzie</option></select></label>
         </div>
-        <menu><button type="button" data-close class="button">Anuluj</button><button class="button primary" type="submit">Zapisz link</button></menu>
+        <menu><button type="button" data-close class="button" data-t="admin.link_dialog.cancel">Anuluj</button><button class="button primary" type="submit" data-t="admin.link_dialog.save">Zapisz link</button></menu>
       </form>
     </dialog>
 
     <dialog id="iconsListDialog" class="wide-dialog">
       <div class="modal-panel">
         <header class="modal-heading">
-          <div><span class="eyebrow">Ikony aplikacji</span><h2>Lista ikon</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
+          <div><span class="eyebrow" data-t="admin.icons.eyebrow">Ikony aplikacji</span><h2 data-t="admin.icons.title">Lista ikon</h2></div>
+          <button type="button" data-close aria-label="Zamknij" data-t-aria="admin.icons.close">×</button>
         </header>
-        <input type="search" id="iconsListSearch" placeholder="Szukaj ikony, np. immich">
+        <input type="search" id="iconsListSearch" placeholder="Szukaj ikony, np. immich" data-t-placeholder="admin.icons.search_placeholder">
         <p class="settings-note" id="iconsListSummary" style="margin: 6px 0 0;"></p>
         <div id="iconsListBox" class="icons-list-box"></div>
         <!-- Ikony Lucide (rysunkowe) uzupełniają brakujące obrazki — pełna lista na stronie Lucide. -->
-        <p class="settings-note" style="margin: 10px 0 0;"><a href="https://lucide.dev/icons/" target="_blank" rel="noreferrer" style="color: var(--accent); font-weight: 700;">Pełna lista ikonek Lucide ↗</a> — gdy brakuje obrazka. Nazwę spod ikony (np. printer) wpisz w pole „Ikona”.</p>
-        <menu><button type="button" data-close class="button">Zamknij</button></menu>
+        <p class="settings-note" style="margin: 10px 0 0;"><a href="https://lucide.dev/icons/" target="_blank" rel="noreferrer" style="color: var(--accent); font-weight: 700;" data-t="admin.icons.lucide_link">Pełna lista ikonek Lucide ↗</a> <span data-t="admin.icons.lucide_hint">— gdy brakuje obrazka. Nazwę spod ikony (np. printer) wpisz w pole „Ikona”.</span></p>
+        <menu><button type="button" data-close class="button" data-t="admin.icons.close">Zamknij</button></menu>
       </div>
     </dialog>
     <dialog id="logsDialog" class="wide-dialog">
       <div class="modal-panel">
         <header class="modal-heading">
-          <div><span class="eyebrow">DIAGNOSTYKA DOCKER</span><h2 id="logsDialogHeaderTitle">Logi operacji</h2></div>
-          <button type="button" data-close aria-label="Zamknij">×</button>
+          <div><span class="eyebrow" data-t="admin.logs.eyebrow">DIAGNOSTYKA DOCKER</span><h2 id="logsDialogHeaderTitle" data-t="admin.logs.title">Logi operacji</h2></div>
+          <button type="button" data-close aria-label="Zamknij" data-t-aria="admin.logs.close">×</button>
         </header>
         <pre id="logsDialogContent" class="logs-body-pre"></pre>
-        <menu><button type="button" data-close class="button">Zamknij</button></menu>
+        <menu><button type="button" data-close class="button" data-t="admin.logs.close">Zamknij</button></menu>
       </div>
     </dialog>
   </body>

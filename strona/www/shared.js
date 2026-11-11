@@ -37,6 +37,7 @@ function setStoredAdminPin(pin) {
     if (clean) {
       localStorage.setItem("myhome.admin.pin", clean);
       sessionStorage.setItem("homedash.admin.pin", clean);
+      localStorage.setItem("ifs.lastActivity", String(Date.now())); // zamek czasowy liczy od zalogowania
     } else {
       clearStoredAdminPin();
     }
@@ -70,10 +71,13 @@ async function request(url, options = {}) {
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error("Niepoprawna odpowiedź serwera API.");
+    throw new Error(t("admin.messages.err_bad_response"));
   }
   if (!response.ok) {
-    throw new Error(data.error || data.message || `Błąd serwera (kod ${response.status})`);
+    const error = new Error(serverErrorText(data, "admin.messages", data.error || data.message || t("admin.messages.err_http", { status: response.status })));
+    error.code = data.code;
+    error.vars = data.vars;
+    throw error;
   }
   return data;
 }
@@ -105,7 +109,8 @@ function fontStack(font) {
 }
 
 function renderFontOptions() {
-  return fontOptions.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("");
+  // „System font” — napis z admin.admin_theme.font_system (czcionki mają własne nazwy).
+  return fontOptions.map(([value, label]) => `<option value="${value}">${escapeHtml(value === "system" && typeof t === "function" ? t("admin.admin_theme.font_system") : label)}</option>`).join("");
 }
 
 function updateRangeValue(input) {

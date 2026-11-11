@@ -124,16 +124,43 @@ function themeToggleIcon(isNight) {
 
 // Ikonka ⓘ z dymkiem: opis po najechaniu myszą, a na telefonie po dotknięciu
 // (dotknięcie ustawia fokus). Tekst opisu jest zwykłym tekstem — bez HTML.
+// W tekście dymku {icon:nazwa} (np. {icon:languages}) pokazuje tę samą ikonkę co w menu strony.
 function infoTip(text) {
-  const safe = String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-  return `<span class="info-tip" tabindex="0" role="note" aria-label="${safe}">${uiIcon("info", 15)}<span class="info-tip-bubble" aria-hidden="true">${safe}</span></span>`;
+  const escaped = String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  const safe = escaped.replace(/\{icon:[a-z0-9-]+\}\s?/g, "");
+  const bubble = escaped.replace(/\{icon:([a-z0-9-]+)\}/g, (match, name) => uiIcon(name, 14));
+  return `<span class="info-tip" tabindex="0" role="note" aria-label="${safe}">${uiIcon("info", 15)}<span class="info-tip-bubble" aria-hidden="true">${bubble}</span></span>`;
 }
 
 // Nasze okienko pytania / komunikatu zamiast confirm() i alert() przeglądarki — wygląda jak
 // reszta okien (ustawienia „Okna modalne”). Zasada: w IF-startpage nie używamy okienek przeglądarki.
 //   if (!(await ifConfirm("Usunąć link?", { okLabel: "Usuń", danger: true }))) return;
 //   await ifAlert("Zapisano.");
-function ifDialog(message, { title = "Potwierdź", okLabel = "OK", cancelLabel = "Anuluj", danger = false, cancel = true } = {}) {
+// Napisy wspólnych okienek (strona i Zaplecze) — sekcja komunikatów miejsca, w którym okienko się pokazuje:
+// strona: page.messages; Zaplecze ustawi window.IF_MESSAGES_SECTION = "admin.messages" (plan „Język”, Etap 3).
+function uiT(key, vars) {
+  return t(`${window.IF_MESSAGES_SECTION || "page.messages"}.${key}`, vars);
+}
+
+// Jedno okienko PIN dla wszystkich wejść — strona główna i Zaplecze (Darek 10.11.2026: „zostawić tylko jeden”).
+// Ten sam wygląd i te same identyfikatory (pinDialog, pinForm, adminPinInput); napisy z sekcji miejsca
+// (strona: page.pin_dialog; Zaplecze poda swoją sekcję w Etapie 3 planu „Język”).
+function pinDialogHtml(section = "page.pin_dialog") {
+  const T = (key) => String(t(`${section}.${key}`)).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  return `
+    <dialog id="pinDialog">
+      <form id="pinForm" class="modal-panel">
+        <header class="modal-heading">
+          <div><span class="eyebrow">${T("eyebrow")}</span><h2>${T("title")}</h2></div>
+          <button type="button" data-close aria-label="${T("close")}">×</button>
+        </header>
+        <label>${T("pin")}<input id="adminPinInput" type="password" inputmode="numeric" autocomplete="current-password" required placeholder="${T("pin_placeholder")}"></label>
+        <menu><button type="button" data-close>${T("cancel")}</button><button class="primary">${T("unlock")}</button></menu>
+      </form>
+    </dialog>`;
+}
+
+function ifDialog(message, { title = uiT("dialog_title"), okLabel = uiT("dialog_ok"), cancelLabel = uiT("dialog_cancel"), danger = false, cancel = true } = {}) {
   return new Promise((resolve) => {
     const dialog = document.createElement("dialog");
     dialog.className = "if-confirm";
@@ -166,20 +193,22 @@ function ifDialog(message, { title = "Potwierdź", okLabel = "OK", cancelLabel =
 // Podsumowanie kopii zapasowej / przywracania po zakończeniu (stan z /api/tools/backup/status).
 function backupResultDialog(s) {
   const restore = s.kind === "przywracanie";
-  const dt = (iso) => (iso ? new Date(iso).toLocaleString("pl-PL") : "");
-  const size = (b) => (b == null ? "" : b < 1e9 ? `${Math.max(1, Math.round(b / 1e6))} MB` : `${(b / 1e9).toLocaleString("pl-PL", { maximumFractionDigits: 1 })} GB`);
+  // Data, liczby — według Ustawień ogólnych (Formaty i jednostki, IF_FORMAT w i18n.js).
+  const dt = (iso) => (iso ? IF_FORMAT.dateTime(iso) : "");
+  const size = (b) => (b == null ? "" : b < 1e9 ? `${IF_FORMAT.number(Math.max(1, Math.round(b / 1e6)))} MB` : `${IF_FORMAT.number(b / 1e9, 1)} GB`);
   if (s.state === "gotowa" && !restore && s.last) {
     const l = s.last;
-    const what = l.czesciowa ? `tylko aplikacja „${l.czesciowa}”` : "wszystko według ustawień";
-    return ifAlert(`Kopia zapasowa zakończona.\n\nKiedy: ${dt(l.data)}\nCo: ${what}\nWielkość: ${size(l.rozmiar)}\nCzas: ${Math.max(1, Math.round((l.czas_s || 0) / 60))} min\nKopii na dysku: ${(s.copies || []).length}`, { title: "Gotowe" });
+    const what = l.czesciowa ? uiT("backup_what_app", { app: l.czesciowa }) : uiT("backup_what_all");
+    return ifAlert(uiT("backup_done", { when: dt(l.data), what, size: size(l.rozmiar), minutes: Math.max(1, Math.round((l.czas_s || 0) / 60)), copies: (s.copies || []).length }), { title: uiT("done_title") });
   }
   if (s.state === "gotowa" && restore && s.lastRestore) {
     const r = s.lastRestore;
     const m = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})/.exec(r.kopia || "");
     const copy = m ? `${Number(m[3])}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : r.kopia;
-    return ifAlert(`Przywracanie zakończone.\n\nCo: ${r.aplikacja}\nZ kopii z: ${copy}\nKiedy: ${dt(r.data)}\n\nDane sprzed przywrócenia (nic nie zostało usunięte):\n${r.odlozone || ""}`, { title: "Gotowe" });
+    return ifAlert(uiT("restore_done", { app: r.wszystkie ? uiT("restore_all_apps") : r.aplikacja, copy, when: dt(r.data), moved: r.odlozone || "" }), { title: uiT("done_title") });
   }
-  return ifAlert(`${restore ? "Przywracanie nie powiodło się" : "Kopia zapasowa nie powiodła się"}.\n\n${s.message || "Nieznany błąd."}\n\nNic nie zostało usunięte. Sprawdź, czy dysk na kopie jest podłączony, i spróbuj ponownie.`, { title: "Błąd" });
+  const message = backupMessageText(s, window.IF_MESSAGES_SECTION || "page.messages");
+  return ifAlert(`${uiT(restore ? "restore_failed" : "backup_failed")}.\n\n${message || uiT("unknown_error")}\n\n${uiT("failed_hint")}`, { title: uiT("error_title") });
 }
 
 function ifConfirm(message, options = {}) {
@@ -187,5 +216,148 @@ function ifConfirm(message, options = {}) {
 }
 
 function ifAlert(message, options = {}) {
-  return ifDialog(message, { title: "Informacja", cancel: false, ...options });
+  return ifDialog(message, { title: uiT("info_title"), cancel: false, ...options });
+}
+
+// ─── Zamek czasowy: wylogowanie po braku aktywności (Darek 10.11.2026) ──────────
+// Ustawienie: Zaplecze → Ustawienia ogólne (5 / 15 / 30 / 60 min albo „Nigdy”), domyślnie 30 min.
+// Ostatnia aktywność (ruch myszy, klawiatura, dotyk) jest wspólna dla wszystkich kart przeglądarki.
+// Klucze zapamiętanego PIN-u takie same jak w app.js / shared.js (get/set/clearStoredAdminPin).
+const IDLE_ACTIVITY_KEY = "ifs.lastActivity";
+const IDLE_MINUTES_KEY = "ifs.autoLogoutMinutes";
+const IDLE_DEFAULT_MINUTES = 30;
+
+function idleStore(action, key, value) {
+  try {
+    if (action === "get") return localStorage.getItem(key);
+    if (action === "set") localStorage.setItem(key, value);
+  } catch {}
+  return null;
+}
+
+function idleMinutes() {
+  const saved = idleStore("get", IDLE_MINUTES_KEY);
+  const minutes = Number(saved);
+  return saved !== null && Number.isFinite(minutes) ? minutes : IDLE_DEFAULT_MINUTES;
+}
+
+function idleHasPin() {
+  try { return Boolean(localStorage.getItem("myhome.admin.pin") || sessionStorage.getItem("homedash.admin.pin")); }
+  catch { return false; }
+}
+
+function idleTouch() {
+  idleStore("set", IDLE_ACTIVITY_KEY, String(Date.now()));
+}
+
+// Czy minął czas? Zwraca liczbę minut, po których wylogowano, albo 0.
+function idleExpired() {
+  const minutes = idleMinutes();
+  if (!minutes || !idleHasPin()) return 0;
+  const last = Number(idleStore("get", IDLE_ACTIVITY_KEY)) || 0;
+  if (!last) { idleTouch(); return 0; }
+  return Date.now() - last > minutes * 60000 ? minutes : 0;
+}
+
+// Przy wczytaniu strony — zanim strona albo Zaplecze użyje zapamiętanego PIN-u: po długiej przerwie
+// (np. przeglądarka zamknięta na noc) PIN jest zapominany od razu.
+(function idleStartupCheck() {
+  if (!idleExpired()) return;
+  try {
+    localStorage.removeItem("myhome.admin.pin");
+    sessionStorage.removeItem("homedash.admin.pin");
+  } catch {}
+  idleTouch();
+})();
+
+// Włączenie zamka na stronie / w Zapleczu. onLock(minuty) — co pokazać po wylogowaniu.
+function initIdleLock(onLock) {
+  const check = () => {
+    const minutes = idleExpired();
+    if (!minutes) return false;
+    if (typeof clearStoredAdminPin === "function") clearStoredAdminPin();
+    idleTouch();
+    onLock(minutes);
+    return true;
+  };
+  let lastWrite = 0;
+  const activity = () => {
+    const now = Date.now();
+    if (now - lastWrite < 5000) return;
+    lastWrite = now;
+    if (!check()) idleTouch();
+  };
+  ["mousemove", "mousedown", "keydown", "touchstart", "wheel"].forEach((name) => window.addEventListener(name, activity, { passive: true }));
+  setInterval(check, 20000);
+  // Aktualne ustawienie z serwera (bez PIN-u) — zapamiętane na następne wczytanie.
+  fetch("/api/dashboard/settings").then((res) => res.json()).then((data) => {
+    const minutes = Number(data?.settings?.autoLogoutMinutes);
+    idleStore("set", IDLE_MINUTES_KEY, String([0, 5, 15, 30, 60].includes(minutes) ? minutes : IDLE_DEFAULT_MINUTES));
+    check();
+  }).catch(() => {});
+}
+
+// ─── Teksty z serwera w wybranym języku (USTALENIA 11.11.2026) ───────────────────
+// Serwer wysyła obok polskiego tekstu kod i wartości (zgłoszenia), części nazwy (czujniki)
+// i znacznik dysku głównego. Napisy są w sekcji miejsca, w którym tekst się pokazuje
+// (np. admin.alerts, page.alerts_preview). Brak napisu → tekst z serwera, jak dawniej.
+function srvHas(key) {
+  return Boolean(window.IF_I18N && typeof IF_I18N.has === "function" && IF_I18N.has(key));
+}
+
+function serverSensorName(parts, fallback, section) {
+  if (!parts || !srvHas(`${section}.sensor_package`)) return fallback || "";
+  const group = parts.group && srvHas(`${section}.sensor_group_${parts.group}`)
+    ? t(`${section}.sensor_group_${parts.group}`)
+    : (parts.groupRaw || fallback || "");
+  if (!parts.part) return group;
+  return t(`${section}.sensor_${parts.part}`, { group, n: parts.index, label: parts.label });
+}
+
+function serverMountName(disk, section) {
+  if (disk && disk.mountRoot && srvHas(`${section}.disk_root`)) return t(`${section}.disk_root`);
+  return disk?.mount || "";
+}
+
+// Błąd z serwera (odpowiedź z „code” i „vars”) → tekst w wybranym języku z sekcji komunikatów miejsca
+// (np. page.messages, admin.messages); brak napisu → polski tekst z serwera.
+function serverErrorText(data, section, fallback) {
+  const key = `${section}.err_${data?.code}`;
+  if (!data?.code || !srvHas(key)) return fallback;
+  const vars = { ...(data.vars || {}) };
+  if (vars.sensorParts) vars.sensor = serverSensorName(vars.sensorParts, vars.sensor, "admin.alerts");
+  return t(key, vars);
+}
+
+// Kopia zapasowa (zadanie if-backup): etap i komunikat w wybranym języku — bkp_step_* / bkp_msg_*
+// w sekcji miejsca; brak kodu albo napisu → polski tekst z serwera.
+function backupJobText(code, vars, fallback, section) {
+  if (!code || !srvHas(`${section}.bkp_msg_${code}`)) return fallback || "";
+  return t(`${section}.bkp_msg_${code}`, vars || {});
+}
+
+function backupStepText(s, section) {
+  if (s?.stepCode && srvHas(`${section}.bkp_step_${s.stepCode}`)) return t(`${section}.bkp_step_${s.stepCode}`, s.stepVars || {});
+  return s?.step || "";
+}
+
+function backupMessageText(s, section) {
+  return backupJobText(s?.messageCode, s?.messageVars, s?.message, section);
+}
+
+function serverAlertText(alert, section) {
+  const base = `${section}.srv_${alert.code}`;
+  const plural = srvHas(`${base}_title_other`);
+  if (!alert.code || !(srvHas(`${base}_title`) || plural)) return { title: alert.title || "", message: alert.message || "" };
+  const vars = { ...(alert.vars || {}) };
+  if (alert.sensor) vars.sensor = serverSensorName(alert.sensor, alert.resource, section);
+  if (alert.mountRoot) vars.mount = serverMountName({ mountRoot: true, mount: vars.mount }, section);
+  // Temperatury przychodzą w °C — w tekście z jednostką z Ustawień ogólnych (°C / °F).
+  if (vars.temp != null && !Number.isNaN(Number(vars.temp))) vars.temp = IF_FORMAT.temp(vars.temp);
+  if (/^temp_/.test(alert.code || "") && vars.limit != null && !Number.isNaN(Number(vars.limit))) vars.limit = IF_FORMAT.temp(vars.limit);
+  if (alert.code === "backup_failed" && vars.errorCode) vars.error = backupJobText(vars.errorCode, vars.errorVars, vars.error, section);
+  if (alert.code === "backup_failed" && !vars.error) vars.error = t(`${section}.srv_unknown_error`);
+  const title = plural ? tn(`${base}_title`, vars.n, vars) : t(`${base}_title`, vars);
+  const message = srvHas(`${base}_message`) ? t(`${base}_message`, vars) : (alert.message || "");
+  return { title, message };
 }

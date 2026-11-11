@@ -23,7 +23,7 @@ sprawdz() {
     if [ -x /usr/local/bin/if-system-updates ] \
         && ! cmp -s "$APP_DIR/strona/extras/system-updates/if-system-updates" /usr/local/bin/if-system-updates; then
         brak="${brak:+$brak
-}nowa wersja zadania if-system-updates"
+}$(t 'nowa wersja zadania %s' if-system-updates)"
     fi
     [ -z "$brak" ] || printf '%s\n' "$brak"
 }

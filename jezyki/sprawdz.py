@@ -52,7 +52,9 @@ def code_keys():
 
 
 # Opis w run / run_sh / info / warn podany wprost (bez $(t ...)) — nie zostanie przetłumaczony.
-BARE = re.compile(r"""^\s*(run|run_sh|info|warn)\s+(["'])(?!\$)""", re.M)
+# Także kolejny wiersz listy braków w sprawdz() (brak="${brak:+$brak
+# }tekst") — wiersz zaczynający się od „}” i tekstu zamiast $(t ...) (audyt 11.11.2026).
+BARE = re.compile(r"""^\s*(run|run_sh|info|warn)\s+(["'])(?!\$)|^\}(?!\$)[^\s"]""", re.M)
 
 
 def bare_texts():

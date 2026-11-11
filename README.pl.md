@@ -13,7 +13,9 @@ Część pakietu **IdeaForge**.
   i kopią zapasową.
 
 **Języki:** program `if-server` mówi po polsku albo po angielsku (wybór na pierwszym ekranie).
-Strona startowa na razie po polsku; angielska jest następnym krokiem.
+Od 0.6 strona startowa i Zaplecze też są po polsku albo po angielsku (Zaplecze → Ustawienia
+ogólne → Język / Language); inne języki dodasz w module Tłumacz, bez programowania. Data, godzina,
+liczby i °C / °F — według Ustawień ogólnych → Formaty i jednostki.
 
 **Wersje (od 0.3.0):** druga cyfra jest wspólna dla serwera i strony (0.3, 0.4…). Drobne
 poprawki mają trzecią cyfrę (v0.4.1, v0.4.2…); stronę aktualizuje Upgrade albo przycisk
@@ -84,6 +86,7 @@ Zmiana języka: menu → Język / Language. Strona startowa: `http://<adres-serw
 | 0.4: Instalator (LubeLogger z compose z GitHuba) | serwer testowy | aplikacja działa po Deploy w Dockge |
 | 0.4.1: aktualizacja aplikacji — udana, nieistniejąca wersja, wersja padająca | serwer testowy | powrót do poprzedniej wersji z danymi |
 | 0.5.0: czysta instalacja Debiana 13 po angielsku — każde okno i krok | Dell Wyse | 15 z 15, strona startowa i Dockge działają |
+| 0.6.0: aktualizacja z 0.5.0 przez `sudo if-server` → Upgrade; strona po angielsku — kopia zapasowa, Instalator aplikacji, °F, Tłumacz | Dell Wyse | zaktualizowane 3 z 3, 15 z 15, wszystko zaliczone |
 
 ## Historia projektu
 

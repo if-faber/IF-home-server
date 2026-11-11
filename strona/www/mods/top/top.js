@@ -20,16 +20,16 @@
       size /= 1024;
       unit++;
     }
-    return `${size >= 10 || unit < 2 ? Math.round(size) : size.toFixed(1)} ${units[unit]}`;
+    return `${IF_FORMAT.number(size, size >= 10 || unit < 2 ? 0 : 1)} ${units[unit]}`;
   }
 
   function formatSpeed(bytesPerSec) {
     const num = Number(bytesPerSec);
-    if (!Number.isFinite(num) || num <= 0) return "0.0 KB/s";
+    if (!Number.isFinite(num) || num <= 0) return `${IF_FORMAT.number(0, 1)} KB/s`;
     if (num < 1024 * 1024) {
-      return `${(num / 1024).toFixed(1)} KB/s`;
+      return `${IF_FORMAT.number(num / 1024, 1)} KB/s`;
     }
-    return `${(num / (1024 * 1024)).toFixed(2)} MB/s`;
+    return `${IF_FORMAT.number(num / (1024 * 1024), 2)} MB/s`;
   }
 
   function formatUptime(seconds) {
@@ -56,37 +56,48 @@
     return "top-temp-cool";
   }
 
-  // ─── Wspólne fragmenty HTML (modal, akordeon, karta w Zapleczu) ───────────
+  // ─── Napisy (plan „Język”) ─────────────────────────────────────────────────
+  // Panel jest na stronie (Status serwera → sekcja page.diagnostics) i w Zapleczu (Statystyki Live).
+  // To ten sam kod, ale osobne miejsca → osobne wpisy w pliku języka: wywołujący podaje sekcję
+  // w mount(root, { section }). Domyślnie page.diagnostics; Zaplecze (Statystyki Live) — admin.live.
+  function texts(section) {
+    const L = (key, vars) => escapeTopHtml(t(`${section}.${key}`, vars));
+    L.n = (key, n, vars) => escapeTopHtml(tn(`${section}.${key}`, n, vars));
+    L.raw = (key, vars) => t(`${section}.${key}`, vars);
+    L.section = section;
+    return L;
+  }
 
-  function titleBoxHtml(subtitle) {
+  // ─── Wspólne fragmenty HTML (akordeon, karta w Zapleczu) ─────────────────
+
+  function titleBoxHtml(subtitle, L) {
     return `
       <div class="top-header-title-box">
-        <div class="top-live-dot" data-role="live-dot" title="Transmisja telemetrii na żywo"></div>
+        <div class="top-live-dot" data-role="live-dot" title="${L("live_dot")}"></div>
         <div>
-          <span class="eyebrow">Diagnostyka Serwera</span>
+          <span class="eyebrow">${L("eyebrow")}</span>
           <h2 style="margin: 0; font-size: 1.1rem;">${subtitle}</h2>
-          <span class="top-header-sub" data-role="uptime">Ładowanie telemetrii...</span>
+          <span class="top-header-sub" data-role="uptime">${L("loading")}</span>
         </div>
       </div>
     `;
   }
 
-  function bodyHtml() {
+  function bodyHtml(L) {
     return `
       <div class="top-body" data-role="body">
-        <div class="empty" style="padding: 2rem;">Inicjalizacja diagnostyki serwera...</div>
+        <div class="empty" style="padding: 2rem;">${L("initializing")}</div>
       </div>
     `;
   }
 
-  function footerHtml({ withClose } = {}) {
+  function footerHtml(L) {
     return `
       <menu class="top-modal-footer">
-        <span data-role="last-updated" style="color:var(--muted); font-size:var(--top-wyniki);">Oczekiwanie na próbkę</span>
+        <span data-role="last-updated" style="color:var(--muted); font-size:var(--top-wyniki);">${L("waiting")}</span>
         <div style="display:flex; gap:8px;">
-          <button type="button" class="button" data-role="pause-btn">${uiIcon("pause", 16)} Pauza</button>
-          <button type="button" class="button" data-role="refresh-btn">${uiIcon("refresh", 16)} Odśwież</button>
-          ${withClose ? '<button type="button" class="button primary" data-role="footer-close-btn">Zamknij</button>' : ""}
+          <button type="button" class="button" data-role="pause-btn">${uiIcon("pause", 16)} ${L("pause")}</button>
+          <button type="button" class="button" data-role="refresh-btn">${uiIcon("refresh", 16)} ${L("refresh")}</button>
         </div>
       </menu>
     `;
@@ -94,7 +105,7 @@
 
   // ─── Silnik: kontroler niezależny dla każdego zamontowanego panelu ────────
 
-  function createController(root, { withTemperatures = false } = {}) {
+  function createController(root, { withTemperatures = false, L } = {}) {
     let activeTimer = null;
     let isPaused = false;
     let currentTab = "processes"; // "processes" | "containers"
@@ -114,7 +125,7 @@
       } catch (err) {
         console.warn("Błąd pobierania statystyk top:", err.message);
         const updated = root.querySelector('[data-role="last-updated"]');
-        if (updated) updated.textContent = `Błąd: ${err.message}`;
+        if (updated) updated.textContent = L.raw("error", { message: err.message });
       }
     }
 
@@ -124,13 +135,13 @@
       const lastUpdated = root.querySelector('[data-role="last-updated"]');
 
       if (uptimeLabel) {
-        const load = data.cpu ? `Load: ${data.cpu.load1?.toFixed(2)}, ${data.cpu.load5?.toFixed(2)}` : "";
-        const pkgTemp = data.cpu?.packageTemp ? ` • Temp CPU: ${Math.round(data.cpu.packageTemp)}°C` : "";
-        uptimeLabel.textContent = `Uptime: ${formatUptime(data.uptime)} • ${load}${pkgTemp}`;
+        const load = data.cpu ? L.raw("load", { l1: IF_FORMAT.number(data.cpu.load1, 2), l5: IF_FORMAT.number(data.cpu.load5, 2) }) : "";
+        const pkgTemp = data.cpu?.packageTemp ? ` • ${L.raw("cpu_temp", { temp: IF_FORMAT.temp(data.cpu.packageTemp) })}` : "";
+        uptimeLabel.textContent = `${L.raw("uptime", { time: formatUptime(data.uptime) })} • ${load}${pkgTemp}`;
       }
 
       if (lastUpdated) {
-        lastUpdated.textContent = `Zaktualizowano: ${new Date(data.updated || Date.now()).toLocaleTimeString("pl-PL")}`;
+        lastUpdated.textContent = L.raw("updated", { time: IF_FORMAT.time(data.updated || Date.now()) });
       }
 
       if (!body) return;
@@ -141,7 +152,7 @@
       const cpuSensor = allSensors.find((s) => /^(Package id \d+|Tctl)$/i.test(s.label || ""));
       const cpuGridHtml = cores.map((c) => {
         const usage = Math.max(0, Math.min(100, Number(c.usage) || 0));
-        const temp = c.temperature ? `${Math.round(c.temperature)}°C` : "—";
+        const temp = c.temperature ? IF_FORMAT.temp(c.temperature) : "—";
         const coreSensor = allSensors.find((s) => new RegExp(`^Core\\s*${c.core}$`, "i").test(s.label || "")) || cpuSensor;
         const tempClass = getTempClass(c.temperature, coreSensor?.warn, coreSensor?.alarm);
         return `
@@ -153,7 +164,7 @@
             <div class="top-core-bar">
               <div class="top-core-fill ${usage > 75 ? 'is-high' : ''}" style="width: ${usage}%"></div>
             </div>
-            <div class="top-core-usage">${usage.toFixed(1)}%</div>
+            <div class="top-core-usage">${IF_FORMAT.number(usage, 1, { minDigits: 1 })}%</div>
           </div>
         `;
       }).join("");
@@ -187,8 +198,8 @@
         return `
           <div class="top-disk-box">
             <div class="top-disk-header">
-              <strong>${d.mount}</strong>
-              <span>${formatBytes(d.available)} wolne (${p}%)</span>
+              <strong>${d.mountRoot && typeof serverMountName === "function" ? escapeTopHtml(serverMountName(d, L.section)) : escapeTopHtml(d.mount)}</strong>
+              <span>${L("disk_free", { size: formatBytes(d.available), percent: p })}</span>
             </div>
             <div class="top-core-bar">
               <div class="top-core-fill ${p > 85 ? 'is-high' : ''}" style="width: ${p}%"></div>
@@ -197,23 +208,24 @@
         `;
       }).join("");
 
-      // 5. Temperatury — wszystkie czujniki (tylko gdy włączone przy montażu)
+      // 5. Temperatury — wszystkie czujniki (tylko gdy włączone przy montażu; dziś tylko Zaplecze,
+      //    napisy w sekcji admin.live; nazwy czujników składane z części od serwera).
       const sensors = withTemperatures && Array.isArray(data.temperatures) ? data.temperatures : [];
       const tempsHtml = sensors.map((s) => `
           <div class="top-core-box">
             <div class="top-core-header">
-              <span>${escapeTopHtml(s.name)}</span>
-              <span class="top-core-temp ${getTempClass(s.temp, s.warn, s.alarm)}">${Math.round(s.temp)}°C</span>
+              <span>${escapeTopHtml(typeof serverSensorName === "function" ? serverSensorName(s.nameParts, s.name, L.section) : s.name)}</span>
+              <span class="top-core-temp ${getTempClass(s.temp, s.warn, s.alarm)}">${IF_FORMAT.temp(s.temp)}</span>
             </div>
           </div>
         `).join("");
       const tempsSectionHtml = withTemperatures ? `
         <section class="top-section-card">
           <div class="top-section-title">
-            <span>Temperatury</span>
-            <span>${sensors.length} ${sensors.length === 1 ? "czujnik" : sensors.length < 5 ? "czujniki" : "czujników"}</span>
+            <span>${L("temps_title")}</span>
+            <span>${L.n("temps_count", sensors.length)}</span>
           </div>
-          <div class="top-temps-grid">${tempsHtml || '<div class="empty">Brak czujników temperatury</div>'}</div>
+          <div class="top-temps-grid">${tempsHtml || `<div class="empty">${L("temps_none")}</div>`}</div>
         </section>
       ` : "";
 
@@ -224,8 +236,8 @@
       const tableTabsHtml = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <div class="top-tabs-nav">
-            <button type="button" class="top-tab-btn ${currentTab === 'processes' ? 'active' : ''}" data-role="tab-processes">Procesy kontenera (${processes.length})</button>
-            <button type="button" class="top-tab-btn ${currentTab === 'containers' ? 'active' : ''}" data-role="tab-containers">Kontenery Docker (${containers.length})</button>
+            <button type="button" class="top-tab-btn ${currentTab === 'processes' ? 'active' : ''}" data-role="tab-processes">${L("tab_processes", { n: processes.length })}</button>
+            <button type="button" class="top-tab-btn ${currentTab === 'containers' ? 'active' : ''}" data-role="tab-containers">${L("tab_containers", { n: containers.length })}</button>
           </div>
         </div>
       `;
@@ -236,11 +248,11 @@
           <table class="top-table">
             <thead>
               <tr>
-                <th>PID</th>
-                <th>Użytkownik</th>
-                <th>% CPU</th>
-                <th>% RAM</th>
-                <th>Polecenie</th>
+                <th>${L("col_pid")}</th>
+                <th>${L("col_user")}</th>
+                <th>${L("col_cpu")}</th>
+                <th>${L("col_ram")}</th>
+                <th>${L("col_command")}</th>
               </tr>
             </thead>
             <tbody>
@@ -248,8 +260,8 @@
                 <tr>
                   <td>${p.pid}</td>
                   <td>${p.user}</td>
-                  <td class="top-badge-cpu">${Number(p.cpu).toFixed(1)}%</td>
-                  <td class="top-badge-mem">${Number(p.mem).toFixed(1)}%</td>
+                  <td class="top-badge-cpu">${IF_FORMAT.number(p.cpu, 1, { minDigits: 1 })}%</td>
+                  <td class="top-badge-mem">${IF_FORMAT.number(p.mem, 1, { minDigits: 1 })}%</td>
                   <td style="max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${p.command}">${p.command}</td>
                 </tr>
               `).join("")}
@@ -261,10 +273,10 @@
           <table class="top-table">
             <thead>
               <tr>
-                <th>Kontener</th>
-                <th>% CPU</th>
-                <th>Zużycie RAM</th>
-                <th>PIDs</th>
+                <th>${L("col_container")}</th>
+                <th>${L("col_cpu")}</th>
+                <th>${L("col_ram_usage")}</th>
+                <th>${L("col_pids")}</th>
               </tr>
             </thead>
             <tbody>
@@ -285,10 +297,10 @@
         <!-- 1. CPU Section -->
         <section class="top-section-card">
           <div class="top-section-title">
-            <span>Obciążenie procesora per rdzeń (${cores.length} rdzenie)</span>
-            <span>Load Avg: ${data.cpu?.load1?.toFixed(2) || "0.00"}</span>
+            <span>${L.n("cpu_title", cores.length)}</span>
+            <span>${L("load_avg", { value: IF_FORMAT.number(data.cpu?.load1 || 0, 2, { minDigits: 2 }) })}</span>
           </div>
-          <div class="top-cpu-grid">${cpuGridHtml || '<div class="empty">Brak danych CPU</div>'}</div>
+          <div class="top-cpu-grid">${cpuGridHtml || `<div class="empty">${L("no_cpu")}</div>`}</div>
         </section>
 
         ${tempsSectionHtml}
@@ -298,38 +310,38 @@
           <!-- RAM -->
           <section class="top-section-card">
             <div class="top-section-title">
-              <span>Pamięć operacyjna RAM</span>
+              <span>${L("ram_title")}</span>
               <span>${formatBytes(memUsed)} / ${formatBytes(memTotal)}</span>
             </div>
             <div class="top-ram-segments">
-              <div class="top-ram-seg-used" style="width: ${usedPct}%" title="Użyta: ${formatBytes(memUsed)}"></div>
-              <div class="top-ram-seg-cache" style="width: ${cachePct}%" title="Cache/Buffery: ${formatBytes(memCache)}"></div>
-              <div class="top-ram-seg-free" style="width: ${freePct}%" title="Dostępna: ${formatBytes(memFree)}"></div>
+              <div class="top-ram-seg-used" style="width: ${usedPct}%" title="${L("ram_used", { size: formatBytes(memUsed) })}"></div>
+              <div class="top-ram-seg-cache" style="width: ${cachePct}%" title="${L("ram_cache_tip", { size: formatBytes(memCache) })}"></div>
+              <div class="top-ram-seg-free" style="width: ${freePct}%" title="${L("ram_available", { size: formatBytes(memFree) })}"></div>
             </div>
             <div class="top-ram-legend">
-              <div class="top-legend-item"><div class="top-legend-dot used"></div><span>Użyta: ${formatBytes(memUsed)}</span></div>
-              <div class="top-legend-item"><div class="top-legend-dot cache"></div><span>Cache: ${formatBytes(memCache)}</span></div>
-              <div class="top-legend-item"><div class="top-legend-dot free"></div><span>Wolna: ${formatBytes(memFree)}</span></div>
-              <div class="top-legend-item"><div class="top-legend-dot swap"></div><span>Swap: ${formatBytes(swapUsed)} / ${formatBytes(swapTotal)}</span></div>
+              <div class="top-legend-item"><div class="top-legend-dot used"></div><span>${L("ram_used", { size: formatBytes(memUsed) })}</span></div>
+              <div class="top-legend-item"><div class="top-legend-dot cache"></div><span>${L("ram_cache", { size: formatBytes(memCache) })}</span></div>
+              <div class="top-legend-item"><div class="top-legend-dot free"></div><span>${L("ram_free", { size: formatBytes(memFree) })}</span></div>
+              <div class="top-legend-item"><div class="top-legend-dot swap"></div><span>${L("swap", { used: formatBytes(swapUsed), total: formatBytes(swapTotal) })}</span></div>
             </div>
           </section>
 
           <!-- Network -->
           <section class="top-section-card">
             <div class="top-section-title">
-              <span>Ruch sieciowy w czasie rzeczywistym</span>
+              <span>${L("net_title")}</span>
               <span>${net.interfaces?.map(i => i.iface).join(", ") || "eth0"}</span>
             </div>
             <div class="top-net-grid">
               <div class="top-net-box">
-                <span class="top-net-label">${uiIcon("arrowDown", 14)} Pobieranie (Download)</span>
+                <span class="top-net-label">${uiIcon("arrowDown", 14)} ${L("net_download")}</span>
                 <span class="top-net-speed">${rxSpeed}</span>
-                <span class="top-net-total">Odebrano: ${rxTotal}</span>
+                <span class="top-net-total">${L("net_received", { size: rxTotal })}</span>
               </div>
               <div class="top-net-box">
-                <span class="top-net-label">${uiIcon("arrowUp", 14)} Wysyłanie (Upload)</span>
+                <span class="top-net-label">${uiIcon("arrowUp", 14)} ${L("net_upload")}</span>
                 <span class="top-net-speed">${txSpeed}</span>
-                <span class="top-net-total">Wysłano: ${txTotal}</span>
+                <span class="top-net-total">${L("net_sent", { size: txTotal })}</span>
               </div>
             </div>
           </section>
@@ -338,10 +350,10 @@
         <!-- 3. Disks -->
         <section class="top-section-card">
           <div class="top-section-title">
-            <span>Dyski i pamięć masowa</span>
-            <span>${disks.length} ${disks.length === 1 ? 'dysk' : 'dyski'}</span>
+            <span>${L("disks_title")}</span>
+            <span>${L.n("disks_count", disks.length)}</span>
           </div>
-          <div class="top-disks-grid">${disksHtml || '<div class="empty">Brak danych o dyskach</div>'}</div>
+          <div class="top-disks-grid">${disksHtml || `<div class="empty">${L("no_disks")}</div>`}</div>
         </section>
 
         <!-- 4. Processes / Containers -->
@@ -362,7 +374,7 @@
       isPaused = !isPaused;
       const btn = root.querySelector('[data-role="pause-btn"]');
       const dot = root.querySelector('[data-role="live-dot"]');
-      if (btn) btn.innerHTML = isPaused ? `${uiIcon("play", 16)} Wznów` : `${uiIcon("pause", 16)} Pauza`;
+      if (btn) btn.innerHTML = isPaused ? `${uiIcon("play", 16)} ${L("resume")}` : `${uiIcon("pause", 16)} ${L("pause")}`;
       if (dot) dot.style.animationPlayState = isPaused ? "paused" : "running";
     }
 
@@ -401,20 +413,22 @@
   window.TopDiagnostics = {
     /**
      * Montuje panel diagnostyczny (nagłówek + ciało + stopka Pauza/Odśwież)
+     * { section } — sekcja pliku języka z napisami panelu (domyślnie page.diagnostics).
      * wewnątrz podanego elementu. Zwraca kontroler {start, stop, refresh,
      * togglePause} — każdy montaż ma własny, niezależny stan i timer, więc
      * wywołujący MUSI wywołać stop() przy odmontowaniu/nawigacji, inaczej
      * odpytywanie /api/system/top zostanie w tle.
      */
-    mount(root, { title, withTemperatures = false } = {}) {
+    mount(root, { title, withTemperatures = false, section = "page.diagnostics" } = {}) {
       if (!root) return null;
+      const L = texts(section);
       root.classList.add("top-inline-mount");
       root.innerHTML = `
-        ${titleBoxHtml(title || "Szczegółowe Statystyki Serwera (Top)")}
-        ${bodyHtml()}
-        ${footerHtml()}
+        ${titleBoxHtml(title ? escapeTopHtml(title) : L("title"), L)}
+        ${bodyHtml(L)}
+        ${footerHtml(L)}
       `;
-      return createController(root, { withTemperatures });
+      return createController(root, { withTemperatures, L });
     }
   };
 })();

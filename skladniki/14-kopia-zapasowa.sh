@@ -20,7 +20,7 @@ sprawdz() {
     if [ -x /usr/local/bin/if-backup ] \
         && ! cmp -s "$APP_DIR/strona/extras/backup/if-backup" /usr/local/bin/if-backup; then
         brak="${brak:+$brak
-}nowa wersja zadania if-backup"
+}$(t 'nowa wersja zadania %s' if-backup)"
     fi
     [ -z "$brak" ] || printf '%s\n' "$brak"
 }

@@ -191,7 +191,7 @@ function renderAdminModeToggle() {
   if (!button || typeof themeToggleIcon !== "function") return;
   const isNight = currentAdminMode() === "n";
   button.innerHTML = themeToggleIcon(isNight);
-  button.title = isNight ? "Tryb nocny — kliknij, żeby przełączyć na dzienny" : "Tryb dzienny — kliknij, żeby przełączyć na nocny";
+  button.title = t(isNight ? "admin.sidebar.mode_night_tip" : "admin.sidebar.mode_day_tip");
 }
 
 function setAdminMode(mode) {
@@ -227,125 +227,128 @@ function bindAdminModeToggle() {
 
 // ─── Widok ───────────────────────────────────────────────────────────────────
 
+// Napisy karty (plan „Język”, Etap 3): sekcja admin.admin_theme; dymki: admin.messages.
+const thT = (key, vars) => escapeHtml(t(`admin.admin_theme.${key}`, vars));
+
 function renderAdminThemeTab() {
   const box = 'class="preset-manager-box" style="margin-top: 10px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.02);"';
   return `
     <div class="admin-tab-container">
       <section class="admin-section-card">
-        <h2 style="margin: 0 0 8px;">${uiIcon("appearance", 22)} Wygląd Zaplecza</h2>
-        <p class="settings-note">Zmiany widać od razu. Zapisz, żeby zostały na stałe. „Cofnij zmiany” wraca do ostatnio zapisanego wyglądu, a „Wygląd startowy” — do wyglądu po instalacji.</p>
+        <h2 style="margin: 0 0 8px;">${uiIcon("appearance", 22)} ${thT("title")}</h2>
+        <p class="settings-note">${thT("intro")}</p>
         <label class="appearance-mode-bar" style="display: grid; gap: 6px; margin: 12px 0 4px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted);">
-          Edytujesz wygląd trybu
+          ${thT("mode_label")}
           <select id="adminThemeMode" style="font-size: 15px; font-weight: 700; text-transform: none; color: var(--text);">
-            <option value="d">Dzień</option>
-            <option value="n">Noc</option>
+            <option value="d">${thT("mode_day")}</option>
+            <option value="n">${thT("mode_night")}</option>
           </select>
         </label>
-        <p class="settings-note" style="margin-top: 0;">Dzień i noc mają osobne ustawienia. Wybór trybu przełącza też Zaplecze, więc widzisz to, co edytujesz.</p>
+        <p class="settings-note" style="margin-top: 0;">${thT("mode_note")}</p>
 
         <form id="adminAppearanceForm" class="admin-form-panel">
 
           <div ${box}>
-            <h4 style="margin-top: 0; margin-bottom: 6px; color: var(--accent);">${uiIcon("appearance", 16)} 1. Kolory, czcionki i panele</h4>
+            <h4 style="margin-top: 0; margin-bottom: 6px; color: var(--accent);">${uiIcon("appearance", 16)} ${thT("group_colors")}</h4>
             <div class="admin-form-grid three-cols">
-              <label>Akcent główny<input id="adminThemeAccent" type="color"></label>
-              <label><span class="field-title">Kolor nagłówków (Akcent pomocniczy) ${infoTip("Nagłówki kafelków w zakładkach Zaplecza (np. „Progi temperatur”) i tytuły okien. Jedną kontrolką poprawisz nagłówki w całym Zapleczu.")}</span><input id="adminThemeAccentAlt" type="color"></label>
-              <label><span class="field-title">Kolor okien (modali) ${infoTip("Kolor zapasowy okien. Okna w Zapleczu biorą wygląd ze Strony Głównej → Wygląd → Okna Modalne (osobno dzień i noc) — tam zmieniasz ich kolor.")}</span><input id="adminThemeSurfaceColor" type="color"></label>
-              <label><span class="field-title">Kolor tekstu w polach ${infoTip("Tekst wpisywany w polach formularzy i listach wyboru w Zapleczu. Podpowiedź w pustym polu ma jaśniejszą wersję tego koloru.")}</span><input id="adminThemeInputText" type="color"></label>
+              <label>${thT("accent")}<input id="adminThemeAccent" type="color"></label>
+              <label><span class="field-title">${thT("accent_alt")} ${infoTip(t("admin.admin_theme.accent_alt_tip"))}</span><input id="adminThemeAccentAlt" type="color"></label>
+              <label><span class="field-title">${thT("surface")} ${infoTip(t("admin.admin_theme.surface_tip"))}</span><input id="adminThemeSurfaceColor" type="color"></label>
+              <label><span class="field-title">${thT("input_text")} ${infoTip(t("admin.admin_theme.input_text_tip"))}</span><input id="adminThemeInputText" type="color"></label>
 
-              <label>Czcionka menu<select id="adminThemeFontMenu">${renderFontOptions()}</select></label>
-              <label>Czcionka kart<select id="adminThemeFontCard">${renderFontOptions()}</select></label>
-              <label>Czcionka opisów<select id="adminThemeFontDescription">${renderFontOptions()}</select></label>
+              <label>${thT("font_menu")}<select id="adminThemeFontMenu">${renderFontOptions()}</select></label>
+              <label>${thT("font_card")}<select id="adminThemeFontCard">${renderFontOptions()}</select></label>
+              <label>${thT("font_description")}<select id="adminThemeFontDescription">${renderFontOptions()}</select></label>
 
-              <label>Tło strony<input id="adminThemeBg" type="color"></label>
-              <label>Zaokrąglenie kart<input id="adminThemeCardRadius" type="range" min="0" max="34" step="1"><span></span></label>
-              <label>Odstęp kart<input id="adminThemeCardGap" type="range" min="8" max="40" step="1"><span></span></label>
+              <label>${thT("bg")}<input id="adminThemeBg" type="color"></label>
+              <label>${thT("card_radius")}<input id="adminThemeCardRadius" type="range" min="0" max="34" step="1"><span></span></label>
+              <label>${thT("card_gap")}<input id="adminThemeCardGap" type="range" min="8" max="40" step="1"><span></span></label>
 
-              <label>Kolor paneli<input id="adminThemePanelColor" type="color"></label>
-              <label>Krycie paneli<input id="adminThemePanelAlpha" type="range" min="5" max="100" step="1"><span></span></label>
-              <label>Rozmycie paneli<input id="adminThemeGlassBlur" type="range" min="0" max="40" step="1"><span></span></label>
+              <label>${thT("panel_color")}<input id="adminThemePanelColor" type="color"></label>
+              <label>${thT("panel_alpha")}<input id="adminThemePanelAlpha" type="range" min="5" max="100" step="1"><span></span></label>
+              <label>${thT("panel_blur")}<input id="adminThemeGlassBlur" type="range" min="0" max="40" step="1"><span></span></label>
             </div>
 
-            <span style="font-size: 11px; font-weight: bold; display: block; margin: 16px 0 8px; color: var(--accent);">${uiIcon("image", 14)} Tapeta</span>
+            <span style="font-size: 11px; font-weight: bold; display: block; margin: 16px 0 8px; color: var(--accent);">${uiIcon("image", 14)} ${thT("wallpaper")}</span>
             <div class="admin-form-grid three-cols">
-              <label>Obraz tła
+              <label>${thT("bg_image")}
                 <select id="adminThemeBackgroundImage">
-                  <option value="">Wyłączony (tylko kolor tła)</option>
-                  <option value="default">Domyślne tło</option>
-                  <option value="custom">Własny obraz</option>
+                  <option value="">${thT("bg_off")}</option>
+                  <option value="default">${thT("bg_default")}</option>
+                  <option value="custom">${thT("bg_custom")}</option>
                 </select>
               </label>
-              <label>Wgraj własny obraz<input id="adminThemeBackgroundUpload" type="file" accept="image/png,image/jpeg,image/webp"></label>
-              <label>Przyciemnienie<input id="adminThemeBackgroundDim" type="range" min="0" max="85" step="1"><span></span></label>
-              <label>Rozmycie tapety<input id="adminThemeBackgroundBlur" type="range" min="0" max="40" step="1"><span></span></label>
-              <label>Widoczność tapety<input id="adminThemeBackgroundOpacity" type="range" min="0" max="100" step="1"><span></span></label>
+              <label>${thT("bg_upload")}<input id="adminThemeBackgroundUpload" type="file" accept="image/png,image/jpeg,image/webp"></label>
+              <label>${thT("bg_dim")}<input id="adminThemeBackgroundDim" type="range" min="0" max="85" step="1"><span></span></label>
+              <label>${thT("bg_blur")}<input id="adminThemeBackgroundBlur" type="range" min="0" max="40" step="1"><span></span></label>
+              <label>${thT("bg_opacity")}<input id="adminThemeBackgroundOpacity" type="range" min="0" max="100" step="1"><span></span></label>
             </div>
           </div>
 
           <div ${box}>
-            <h4 style="margin-top: 0; margin-bottom: 6px; color: var(--accent);">${uiIcon("tabs", 16)} 2. Pasek boczny</h4>
+            <h4 style="margin-top: 0; margin-bottom: 6px; color: var(--accent);">${uiIcon("tabs", 16)} ${thT("group_sidebar")}</h4>
             <div class="admin-form-grid">
-              <label>Kolor paska<input id="adminSidebarColor" type="color"></label>
-              <label>Krycie paska<input id="adminSidebarAlpha" type="range" min="5" max="100" step="1"><span></span></label>
-              <label>Kolor napisów paska<input id="adminMenuTextColor" type="color"></label>
-              <label>Szerokość paska<input id="adminSidebarWidth" type="range" min="220" max="380" step="5"><span></span></label>
+              <label>${thT("sidebar_color")}<input id="adminSidebarColor" type="color"></label>
+              <label>${thT("sidebar_alpha")}<input id="adminSidebarAlpha" type="range" min="5" max="100" step="1"><span></span></label>
+              <label>${thT("menu_text")}<input id="adminMenuTextColor" type="color"></label>
+              <label>${thT("sidebar_width")}<input id="adminSidebarWidth" type="range" min="220" max="380" step="5"><span></span></label>
             </div>
-            <span style="font-size: 11px; font-weight: bold; display: block; margin: 16px 0 8px; color: var(--accent);">Przyciski menu</span>
+            <span style="font-size: 11px; font-weight: bold; display: block; margin: 16px 0 8px; color: var(--accent);">${thT("menu_buttons")}</span>
             <div class="admin-form-grid">
-              <label>Tło<input id="adminMenuBtnBg" type="color"></label>
-              <label>Tekst<input id="adminMenuBtnText" type="color"></label>
-              <label>Tło po najechaniu<input id="adminMenuBtnHoverBg" type="color"></label>
-              <label>Tekst po najechaniu<input id="adminMenuBtnHoverText" type="color"></label>
-              <label>Tło aktywnego<input id="adminMenuBtnActiveBg" type="color"></label>
-              <label>Tekst aktywnego<input id="adminMenuBtnActiveText" type="color"></label>
+              <label>${thT("btn_bg")}<input id="adminMenuBtnBg" type="color"></label>
+              <label>${thT("btn_text")}<input id="adminMenuBtnText" type="color"></label>
+              <label>${thT("btn_hover_bg")}<input id="adminMenuBtnHoverBg" type="color"></label>
+              <label>${thT("btn_hover_text")}<input id="adminMenuBtnHoverText" type="color"></label>
+              <label>${thT("btn_active_bg")}<input id="adminMenuBtnActiveBg" type="color"></label>
+              <label>${thT("btn_active_text")}<input id="adminMenuBtnActiveText" type="color"></label>
             </div>
           </div>
 
           <div ${box}>
-            <h4 style="margin-top: 0; margin-bottom: 14px; color: var(--accent);">${uiIcon("button", 16)} 3. Przyciski akcji</h4>
+            <h4 style="margin-top: 0; margin-bottom: 14px; color: var(--accent);">${uiIcon("button", 16)} ${thT("group_buttons")}</h4>
             <div class="admin-form-grid three-cols" style="margin-bottom: 16px;">
-              <label>Zaokrąglenie<input id="adminBtnRadius" type="range" min="0" max="30" step="1"><span></span></label>
-              <label>Grubość ramki<input id="adminBtnBorderWidth" type="range" min="0" max="4" step="1"><span></span></label>
-              <label>Kolor ramki<input id="adminBtnBorderColor" type="color"></label>
-              <label>Wielkość poświaty<input id="adminBtnGlow" type="range" min="0" max="30" step="1"><span></span></label>
-              <label>Poświata głównego<input id="adminBtnGlowColor" type="color"></label>
-              <label>Poświata ostrzegawczego<input id="adminBtnDangerGlowColor" type="color"></label>
+              <label>${thT("btn_radius")}<input id="adminBtnRadius" type="range" min="0" max="30" step="1"><span></span></label>
+              <label>${thT("btn_border_width")}<input id="adminBtnBorderWidth" type="range" min="0" max="4" step="1"><span></span></label>
+              <label>${thT("btn_border_color")}<input id="adminBtnBorderColor" type="color"></label>
+              <label>${thT("btn_glow")}<input id="adminBtnGlow" type="range" min="0" max="30" step="1"><span></span></label>
+              <label>${thT("btn_glow_color")}<input id="adminBtnGlowColor" type="color"></label>
+              <label>${thT("btn_danger_glow")}<input id="adminBtnDangerGlowColor" type="color"></label>
             </div>
 
             <div class="admin-form-grid" style="gap: 18px; align-items: start;">
               <div style="padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,0.12);">
-                <h5 style="margin: 0 0 10px 0; font-size: 13px;">Przycisk główny</h5>
+                <h5 style="margin: 0 0 10px 0; font-size: 13px;">${thT("primary_title")}</h5>
                 <div style="margin-bottom: 12px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-                  <button type="button" class="button primary" tabindex="-1">${uiIcon("save", 16)} Zapisz</button>
-                  <button type="button" class="button" tabindex="-1">Zwykły</button>
+                  <button type="button" class="button primary" tabindex="-1">${uiIcon("save", 16)} ${thT("sample_save")}</button>
+                  <button type="button" class="button" tabindex="-1">${thT("sample_normal")}</button>
                 </div>
                 <div class="admin-form-grid">
-                  <label>Tło<input id="adminBtnNormalBg" type="color"></label>
-                  <label>Tekst<input id="adminBtnNormalText" type="color"></label>
-                  <label>Tło po najechaniu<input id="adminBtnNormalHoverBg" type="color"></label>
-                  <label>Tekst po najechaniu<input id="adminBtnNormalHoverText" type="color"></label>
+                  <label>${thT("btn_bg")}<input id="adminBtnNormalBg" type="color"></label>
+                  <label>${thT("btn_text")}<input id="adminBtnNormalText" type="color"></label>
+                  <label>${thT("btn_hover_bg")}<input id="adminBtnNormalHoverBg" type="color"></label>
+                  <label>${thT("btn_hover_text")}<input id="adminBtnNormalHoverText" type="color"></label>
                 </div>
               </div>
 
               <div style="padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,0.12);">
-                <h5 style="margin: 0 0 10px 0; font-size: 13px;">Przycisk ostrzegawczy</h5>
+                <h5 style="margin: 0 0 10px 0; font-size: 13px;">${thT("danger_title")}</h5>
                 <div style="margin-bottom: 12px; display: flex; justify-content: center;">
-                  <button type="button" class="button danger" tabindex="-1">${uiIcon("trash", 16)} Usuń</button>
+                  <button type="button" class="button danger" tabindex="-1">${uiIcon("trash", 16)} ${thT("sample_delete")}</button>
                 </div>
                 <div class="admin-form-grid">
-                  <label>Tło<input id="adminBtnDangerBg" type="color"></label>
-                  <label>Tekst<input id="adminBtnDangerText" type="color"></label>
-                  <label>Tło po najechaniu<input id="adminBtnDangerHoverBg" type="color"></label>
-                  <label>Tekst po najechaniu<input id="adminBtnDangerHoverText" type="color"></label>
+                  <label>${thT("btn_bg")}<input id="adminBtnDangerBg" type="color"></label>
+                  <label>${thT("btn_text")}<input id="adminBtnDangerText" type="color"></label>
+                  <label>${thT("btn_hover_bg")}<input id="adminBtnDangerHoverBg" type="color"></label>
+                  <label>${thT("btn_hover_text")}<input id="adminBtnDangerHoverText" type="color"></label>
                 </div>
               </div>
             </div>
           </div>
 
           <menu style="margin-top: 18px; display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap;">
-            <button id="resetAdminAppearance" class="button danger" type="button">Wygląd startowy</button>
-            <button id="revertAdminAppearance" class="button" type="button">Cofnij zmiany</button>
-            <button class="button primary" type="submit">${uiIcon("save", 16)} Zapisz wygląd</button>
+            <button id="resetAdminAppearance" class="button danger" type="button">${thT("reset")}</button>
+            <button id="revertAdminAppearance" class="button" type="button">${thT("revert")}</button>
+            <button class="button primary" type="submit">${uiIcon("save", 16)} ${thT("save")}</button>
           </menu>
         </form>
       </section>
@@ -406,7 +409,7 @@ function bindAdminThemeEvents() {
     modeSelect.value = currentAdminMode();
     modeSelect.addEventListener("change", async (event) => {
       event.stopPropagation();
-      if (adminThemeDirty.size && !(await ifConfirm("Niezapisane zmiany wyglądu przepadną. Przełączyć tryb?", { okLabel: "Przełącz", danger: true }))) {
+      if (adminThemeDirty.size && !(await ifConfirm(t("admin.admin_theme.switch_confirm"), { okLabel: t("admin.admin_theme.switch_ok"), danger: true }))) {
         modeSelect.value = currentAdminMode();
         return;
       }
@@ -439,7 +442,7 @@ function bindAdminThemeEvents() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 8 * 1024 * 1024) {
-      showToast("Obraz jest za duży (maks. 8 MB).");
+      showToast(t("admin.messages.theme_image_too_big"));
       event.target.value = "";
       return;
     }
@@ -449,7 +452,7 @@ function bindAdminThemeEvents() {
       ["backgroundImage", "backgroundDim", "backgroundBlur", "backgroundOpacity"].forEach((key) => adminThemeDirty.add(key));
       applyAdminBackground(collectBackgroundFromForm(), adminPendingBackground);
     } catch (error) {
-      showToast("Nie udało się odczytać pliku.");
+      showToast(t("admin.messages.theme_file_read_failed"));
     }
   });
 
@@ -496,7 +499,7 @@ async function saveAdminAppearance(event) {
     clearAdminThemeStyles();
     applyAdminThemeStyles(state.adminTheme);
     populateAdminAppearanceForm(state.adminTheme);
-    showToast(`Zapisano wygląd Zaplecza (${currentAdminMode() === "d" ? "dzień" : "noc"}).`);
+    showToast(t(currentAdminMode() === "d" ? "admin.messages.theme_saved_day" : "admin.messages.theme_saved_night"));
   } catch (error) {
     showToast(error.message);
   }
@@ -508,12 +511,12 @@ function revertAdminAppearance() {
   clearAdminThemeStyles();
   applyAdminThemeStyles(state.adminTheme || {});
   populateAdminAppearanceForm(state.adminTheme || {});
-  showToast("Cofnięto niezapisane zmiany.");
+  showToast(t("admin.messages.theme_reverted"));
 }
 
 async function resetAdminAppearance() {
-  const modeName = currentAdminMode() === "d" ? "dzień" : "noc";
-  if (!(await ifConfirm(`Przywrócić wygląd startowy Zaplecza (${modeName})? Zapisane ustawienia wyglądu tego trybu zostaną usunięte.`, { okLabel: "Przywróć", danger: true }))) return;
+  const confirmKey = currentAdminMode() === "d" ? "reset_confirm_day" : "reset_confirm_night";
+  if (!(await ifConfirm(t(`admin.admin_theme.${confirmKey}`), { okLabel: t("admin.admin_theme.reset_ok"), danger: true }))) return;
   try {
     const data = await request("/api/admin/theme", {
       method: "PUT",
@@ -526,7 +529,7 @@ async function resetAdminAppearance() {
     clearAdminThemeStyles();
     applyAdminThemeStyles(state.adminTheme);
     populateAdminAppearanceForm(state.adminTheme);
-    showToast("Przywrócono wygląd startowy Zaplecza.");
+    showToast(t("admin.messages.theme_reset_done"));
   } catch (error) {
     showToast(error.message);
   }

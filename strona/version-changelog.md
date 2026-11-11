@@ -5,6 +5,27 @@ druga cyfra wersji jest wspólna z serwerem, trzecia — poprawki samej strony.
 
 ---
 
+## v0.6.0 — 2026-11-11
+
+**Strona po angielsku i po polsku** — wybór w Zaplecze → Ustawienia ogólne → Język / Language.
+
+- **Angielski jest językiem bazowym**, polski dostarczany ze stroną. Nowa instalacja startuje po angielsku;
+  strony już działające po aktualizacji zostają po polsku. Napis bez tłumaczenia pokazuje się po angielsku.
+- **Moduł Tłumacz** (włącznik w Ustawieniach ogólnych, kafel w Modułach, ikonka tłumacza <img src="docs/ikony/tlumacz.svg" alt="ikonka tłumacza" height="16">): lista języków z postępem,
+  edytor (angielski | tłumaczenie, filtry sekcji i nieprzetłumaczonych, wyszukiwarka, formy liczby mnogiej),
+  nowy język, wgrywanie pliku, wzór angielski do pobrania, eksport, usuwanie (do `config/langs/deleted`).
+- **Moduły mają własne pliki języka** (`www/mods/<moduł>/langs/`); tłumaczenia użytkownika — w jednym pliku języka.
+- **Komunikaty serwera** (błędy, kopia zapasowa, Instalator aplikacji, alerty) w wybranym języku — serwer wysyła kody.
+- **Formaty i jednostki** w Ustawieniach ogólnych: strefa czasowa, data i godzina, przecinek / kropka, °C / °F
+  (także progi w Centrum alertów). Instalator aplikacji wpisuje aplikacjom wybraną strefę czasową.
+- **Logowanie do Zaplecza:** jedno okienko PIN; „Wyloguj” i „Wróć do strony (zostajesz zalogowany)”;
+  **wylogowanie po braku aktywności** (domyślnie 30 min, do zmiany w Ustawieniach ogólnych).
+- Zaplecze i strona lepiej mieszczą się na telefonie; usunięte nieużywane okienka i kod.
+- Kiosk — jeszcze po polsku (moduł odłożony).
+- Wymaga zaktualizowanych zadań serwera `if-backup` i `if-aplikacje`: `sudo if-server` → aktualizuj → Upgrade.
+
+---
+
 ## v0.4.1 — 2026-11-09
 
 - **Aktualizacja aplikacji jednym przyciskiem** (Zaplecze → Aplikacje → Aktualizacje, „Aktualizuj do …”). Robi to serwer: pobiera nową wersję (aplikacja działa dalej), robi kopię aplikacji (gdy kopia zapasowa jest ustawiona), uruchamia nową wersję i sprawdza, czy działa. Jeśli nie — wraca do poprzedniej wersji razem z danymi z kopii. Postęp nad tabelą, na końcu okienko z wynikiem. Bez Dockge.

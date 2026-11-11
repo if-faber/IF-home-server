@@ -9,15 +9,17 @@ Part of the **IdeaForge** package.
 - `if-server` — a program that stays on the server (`sudo if-server`): it installs, completes
   and updates all components (similar to KIAUH for Klipper).
 - [`strona/`](strona/) — the server's start page in the browser (`http://<server-address>`),
-  with a PIN-protected back office (Zaplecze), server status, alerts, updates, an app installer
+  with a PIN-protected Admin panel, server status, alerts, updates, an app installer
   and backup.
 
 **Languages:** the `if-server` program speaks English or Polish (chosen on the first screen).
-The start page is in Polish for now; English is the next step.
+Since 0.6 the start page and Admin panel are in English or Polish too (Admin panel → General
+settings → Język / Language); other languages can be added in the Translator module, without
+programming. Date, time, numbers and °C / °F follow General settings → Formats and units.
 
 **Versions (since 0.3.0):** the second digit is shared by the server and the page (0.3, 0.4…).
 Small fixes get the third digit (v0.4.1, v0.4.2…); the page is updated by Upgrade or by the
-“Aktualizuj” (Update) button in Zaplecze → Aplikacje.
+“Update” button in Admin panel → Apps.
 
 ## Features
 
@@ -84,6 +86,7 @@ Change the language: menu → Język / Language. Start page: `http://<server-add
 | 0.4: Installer (LubeLogger from a compose file on GitHub) | test server | the app works after Deploy in Dockge |
 | 0.4.1: app update — successful, non-existent version, crashing version | test server | return to the previous version with data |
 | 0.5.0: clean Debian 13 installation in English — every window and step | Dell Wyse | 15 of 15, start page and Dockge work |
+| 0.6.0: update from 0.5.0 with `sudo if-server` → Upgrade; start page in English — backup, app installer, °F, Translator | Dell Wyse | 3 of 3 updated, 15 of 15, all checks passed |
 
 ## Project history
 

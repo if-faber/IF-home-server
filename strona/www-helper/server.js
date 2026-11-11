@@ -212,6 +212,19 @@ function loadDashboardSettings() {
 // (np. http://iflab przy wejściu przez IP) blokuje przeglądarka i strona się nie uruchamia
 // (Darek 9.11.2026). Nazwę serwera („domenę” strony, np. iflab) trzyma defaultHost — używają jej
 // odnośniki do Dockge, Cockpit i aplikacji.
+const AUTO_LOGOUT_CHOICES = [0, 5, 15, 30, 60];
+
+// Formaty i jednostki (plan „Język”, Etap 7) — Ustawienia ogólne.
+const DATE_FORMATS = ["auto", "pl", "en-GB", "en-US", "iso"];
+const DECIMAL_FORMATS = ["auto", "comma", "dot"];
+const TEMPERATURE_UNITS = ["c", "f"];
+
+function validTimeZone(zone) {
+  if (!zone) return false;
+  try { new Intl.DateTimeFormat("en", { timeZone: zone }); return true; } catch { return false; }
+}
+
+
 function sanitizeDashboardSettings(input) {
   const allowed = ["title", "subtitle", "defaultHost", "logo"];
   const output = {};
@@ -219,6 +232,22 @@ function sanitizeDashboardSettings(input) {
   for (const key of allowed) {
     const value = normalizeText(input?.[key]);
     if (value) output[key] = value;
+  }
+
+  // Zamek czasowy Zaplecza (Darek 10.11.2026): wylogowanie po tylu minutach bez aktywności, 0 = nigdy.
+  // Brak wpisu = domyślne 30 minut (liczy przeglądarka, ui-icons.js).
+  // Formaty i jednostki (Etap 7); brak wpisu / „auto” = według języka strony, strefa — przeglądarki.
+  if (DATE_FORMATS.includes(input?.dateFormat) && input.dateFormat !== "auto") output.dateFormat = input.dateFormat;
+  if (DECIMAL_FORMATS.includes(input?.decimal) && input.decimal !== "auto") output.decimal = input.decimal;
+  if (TEMPERATURE_UNITS.includes(input?.temperatureUnit) && input.temperatureUnit !== "c") output.temperatureUnit = input.temperatureUnit;
+  if (validTimeZone(normalizeText(input?.timeZone))) output.timeZone = normalizeText(input.timeZone);
+
+  // Moduł „Tłumacz” (plan „Język”, Etap 4): włącznik w Ustawieniach ogólnych; brak wpisu = wyłączony.
+  if (typeof input?.translatorEnabled === "boolean") output.translatorEnabled = input.translatorEnabled;
+
+  const minutes = Number(input?.autoLogoutMinutes);
+  if (input?.autoLogoutMinutes !== undefined && input?.autoLogoutMinutes !== "" && AUTO_LOGOUT_CHOICES.includes(minutes)) {
+    output.autoLogoutMinutes = minutes;
   }
 
   return output;
@@ -361,16 +390,28 @@ function hasValidPin(req) {
 }
 
 // Middleware dla endpointów, które coś zmieniają albo pokazują wrażliwe dane.
+// Błąd z kodem dla tłumaczeń (plan „Język”, Darek 11.11.2026: „Robimy kody błędów”): polski tekst
+// zostaje w „error” (zapas i zgodność), strona dobiera tekst po „code” z pliku języka.
+function apiError(res, status, code, text, vars = {}, extra = {}) {
+  return res.status(status).json({ ok: false, error: text, code, vars, ...extra });
+}
+
+// Błąd z kodem rzucany w środku funkcji (np. instalator) — apiError odeśle go z kodem.
+function codedError(code, text, vars = {}) {
+  const error = new Error(text);
+  error.code = code;
+  error.vars = vars;
+  return error;
+}
+
 function requirePin(req, res, next) {
   const remaining = pinLockRemainingMs(req);
   if (remaining > 0) {
-    return res.status(429).json({
-      ok: false,
-      error: `Za dużo błędnych prób PIN-u. Spróbuj za ${Math.ceil(remaining / 1000)} s.`
-    });
+    const seconds = Math.ceil(remaining / 1000);
+    return apiError(res, 429, "pin_locked", `Za dużo błędnych prób PIN-u. Spróbuj za ${seconds} s.`, { seconds });
   }
   if (!hasValidPin(req)) {
-    return res.status(403).json({ ok: false, error: "Niepoprawny PIN" });
+    return apiError(res, 403, "pin_invalid", "Niepoprawny PIN");
   }
   next();
 }
@@ -706,6 +747,14 @@ function imageNote(image) {
   return "";
 }
 
+// Kod notatki dla tłumaczeń (plan „Język”): wordpress / database / "".
+function imageNoteCode(image) {
+  const { host, repository } = parseImageRef(image);
+  if (!host && repository === "library/wordpress") return "wordpress";
+  if (!host && ["library/mariadb", "library/mysql", "library/postgres"].includes(repository)) return "database";
+  return "";
+}
+
 async function getInstalledVersionLabel(containerName) {
   try {
     const { stdout } = await execFileAsync("docker", [
@@ -871,13 +920,13 @@ function readTemperature() {
 // Wszystkie czujniki temperatury z /sys/class/hwmon (nazwa układu + etykieta),
 // z czytelną nazwą po polsku. Gdy hwmon jest pusty — strefy z /sys/class/thermal.
 const SENSOR_NAMES = [
-  [/^coretemp$|^k10temp$|^zenpower$/, "Procesor"],
-  [/^acpitz$/, "Płyta główna (ACPI)"],
-  [/^pch_/, "Chipset"],
-  [/^nvme$/, "Dysk NVMe"],
-  [/^drivetemp$/, "Dysk"],
-  [/^amdgpu$|^nouveau$|^radeon$|^i915$/, "Karta graficzna"],
-  [/^iwlwifi/, "Wi-Fi"]
+  [/^coretemp$|^k10temp$|^zenpower$/, "Procesor", "cpu"],
+  [/^acpitz$/, "Płyta główna (ACPI)", "acpi"],
+  [/^pch_/, "Chipset", "chipset"],
+  [/^nvme$/, "Dysk NVMe", "nvme"],
+  [/^drivetemp$/, "Dysk", "disk"],
+  [/^amdgpu$|^nouveau$|^radeon$|^i915$/, "Karta graficzna", "gpu"],
+  [/^iwlwifi/, "Wi-Fi", "wifi"]
 ];
 
 function sensorFriendlyName(chip, label) {
@@ -886,6 +935,18 @@ function sensorFriendlyName(chip, label) {
   const core = label.match(/^Core\s*(\d+)$/i);
   if (core) return `${group} — rdzeń ${core[1]}`;
   return label ? `${group} — ${label}` : group;
+}
+
+// Części nazwy czujnika dla tłumaczeń (plan „Język”, Darek 11.11.2026): strona składa nazwę w wybranym
+// języku. group — rodzaj układu (cpu, acpi, …) albo null i wtedy groupRaw; part — package / core / sensor / label.
+function sensorNameParts(chip, label, sensorIndex) {
+  const group = SENSOR_NAMES.find(([re]) => re.test(chip))?.[2] || null;
+  const parts = { group, groupRaw: group ? "" : chip, part: null, index: null, label: "" };
+  if (/^Package id \d+$/i.test(label) || /^Tctl$/i.test(label)) parts.part = "package";
+  else if (/^Core\s*(\d+)$/i.test(label)) { parts.part = "core"; parts.index = Number(label.match(/^Core\s*(\d+)$/i)[1]); }
+  else if (label) { parts.part = "label"; parts.label = label; }
+  else if (sensorIndex) { parts.part = "sensor"; parts.index = Number(sensorIndex); }
+  return parts;
 }
 
 function readAllTemperatures() {
@@ -911,7 +972,7 @@ function readAllTemperatures() {
         try { label = fs.readFileSync(path.join(dir, `temp${idx}_label`), "utf8").trim(); } catch {}
         try {
           const temp = readTemp(path.join(dir, file));
-          if (temp !== null) sensors.push({ id: `${chip || entry}:${label || `temp${idx}`}`, chip, label, name: sensorFriendlyName(chip, label || (inputs.length > 1 ? `czujnik ${idx}` : "")), temp });
+          if (temp !== null) sensors.push({ id: `${chip || entry}:${label || `temp${idx}`}`, chip, label, name: sensorFriendlyName(chip, label || (inputs.length > 1 ? `czujnik ${idx}` : "")), nameParts: sensorNameParts(chip, label, label ? null : (inputs.length > 1 ? idx : null)), temp });
         } catch {}
       }
     }
@@ -924,7 +985,7 @@ function readAllTemperatures() {
         try { type = fs.readFileSync(path.join(dir, "type"), "utf8").trim(); } catch {}
         try {
           const temp = readTemp(path.join(dir, "temp"));
-          if (temp !== null) sensors.push({ id: `${type}:${entry}`, chip: type, label: "", name: type === "x86_pkg_temp" ? "Procesor — całość" : sensorFriendlyName(type, ""), temp });
+          if (temp !== null) sensors.push({ id: `${type}:${entry}`, chip: type, label: "", name: type === "x86_pkg_temp" ? "Procesor — całość" : sensorFriendlyName(type, ""), nameParts: type === "x86_pkg_temp" ? { group: "cpu", groupRaw: "", part: "package", index: null, label: "" } : sensorNameParts(type, "", null), temp });
         } catch {}
       }
     }
@@ -1146,6 +1207,7 @@ async function readDisks() {
       disks.push({
         filesystem,
         mount: formatMountName(mount),
+        mountRoot: mount === "/" || mount === "/host/root",
         total,
         used,
         available,
@@ -1284,7 +1346,7 @@ app.get("/api/dashboard/settings", (req, res) => {
 
 app.put("/api/dashboard/settings", (req, res) => {
   if (!hasValidPin(req)) {
-    return res.status(403).json({ error: "Niepoprawny PIN" });
+    return apiError(res, 403, "pin_invalid", "Niepoprawny PIN");
   }
 
   const settings = sanitizeDashboardSettings(req.body || {});
@@ -1292,11 +1354,15 @@ app.put("/api/dashboard/settings", (req, res) => {
   const logoData = normalizeText(req.body?.logoData);
 
   if (logoData) {
-    settings.logo = saveDashboardLogo(logoData);
+    try {
+      settings.logo = saveDashboardLogo(logoData);
+    } catch (error) {
+      return apiError(res, 400, "logo_bad_format", error.message);
+    }
   }
 
   if (newPin && newPin.length < 4) {
-    return res.status(400).json({ error: "Nowy PIN musi mieć co najmniej 4 znaki." });
+    return apiError(res, 400, "pin_too_short", "Nowy PIN musi mieć co najmniej 4 znaki.");
   }
 
   saveDashboardSettings(settings);
@@ -1311,7 +1377,7 @@ app.get("/api/dashboard/theme", (req, res) => {
 
 app.put("/api/dashboard/theme", (req, res) => {
   if (!hasValidPin(req)) {
-    return res.status(403).json({ error: "Niepoprawny PIN" });
+    return apiError(res, 403, "pin_invalid", "Niepoprawny PIN");
   }
 
   const theme = req.body?.reset ? {} : sanitizeThemeSettings(req.body || {});
@@ -1448,6 +1514,371 @@ function parseCustomCss(text) {
   return vars;
 }
 
+// ─── Rdzeń tłumaczeń (plan „Język”, Etap 1) ──────────────────────────────────
+// Język bazowy: angielski, wbudowany w kod strony (www/langs/en.json), nie do nadpisania.
+// Tłumaczenia dostarczone ze stroną: www/langs/<kod>.json (np. pl.json).
+// Tłumaczenia użytkownika: CONFIG_DIR/langs/<kod>.json — w danych strony, aktualizacja ich nie rusza.
+// Wybór języka (jeden dla całej strony): CONFIG_DIR/language.json.
+// Brak frazy w tłumaczeniu → napis angielski (robi to www/i18n.js).
+const LANG_BASE = "en";
+const LANG_DEFAULTS_DIR = path.join(WWW_DIR, "langs");
+const LANG_USER_DIR = path.join(CONFIG_DIR, "langs");
+const LANG_CHOICE_FILE = path.join(CONFIG_DIR, "language.json");
+const LANG_CODE_RE = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/;
+
+function readJsonOrEmpty(filename) {
+  try {
+    if (!fs.existsSync(filename)) return {};
+    const data = JSON.parse(fs.readFileSync(filename, "utf8"));
+    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  } catch (error) {
+    console.error(`Język: nie da się odczytać ${filename}:`, error.message);
+    return {};
+  }
+}
+
+// Napisy modułów (plan „Język”, Etap 5): każdy moduł przynosi własne pliki języka w swoim folderze,
+// www/mods/<moduł>/langs/<kod>.json — płaski plik jednej sekcji: napisy i opis miejsca `_desc`
+// (np. www/mods/ports/langs/en.json). Strona dokłada je do grupy `mods` pod nazwą folderu modułu,
+// więc moduł nie nadpisze napisów strony ani innego modułu. Angielski bazowy = en.json strony
+// + en.json modułów; tłumaczenia użytkownika zostają w jednym pliku języka (część `mods`).
+const LANG_MODS_DIR = path.join(WWW_DIR, "mods");
+const LANG_MODULE_RE = /^[a-z][a-z0-9_]*$/;
+
+function moduleLanguageSections(code) {
+  const out = {};
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(LANG_MODS_DIR, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const dir of dirs) {
+    if (!dir.isDirectory() || !LANG_MODULE_RE.test(dir.name)) continue;
+    const file = path.join(LANG_MODS_DIR, dir.name, "langs", `${code}.json`);
+    if (!fs.existsSync(file)) continue;
+    const section = {};
+    for (const [name, text] of Object.entries(readJsonOrEmpty(file))) {
+      if (typeof text === "string") section[name] = text;   // napisy i _desc; zagnieżdżenia i _meta pomijane
+    }
+    if (Object.keys(section).length) out[dir.name] = section;
+  }
+  return out;
+}
+
+// Warstwa języka z kodu: plik strony www/langs/<kod>.json razem z plikami modułów.
+function languageLayer(code) {
+  const layer = readJsonOrEmpty(path.join(LANG_DEFAULTS_DIR, `${code}.json`));
+  const mods = moduleLanguageSections(code);
+  if (Object.keys(mods).length) {
+    const own = layer.mods && typeof layer.mods === "object" && !Array.isArray(layer.mods) ? layer.mods : {};
+    layer.mods = { ...own, ...mods };
+  }
+  return layer;
+}
+
+// Wybór języka zapisywany raz, przy pierwszym uruchomieniu wersji z tłumaczeniami
+// (Darek, 10.11.2026): serwer, który ma już dane strony (services.json), zostaje po polsku;
+// nowa instalacja startuje po angielsku. Dzieje się to przy starcie, zanim strona utworzy services.json.
+function ensureLanguageChoice() {
+  if (fs.existsSync(LANG_CHOICE_FILE)) return;
+  const language = fs.existsSync(DATA_FILE) ? "pl" : LANG_BASE;
+  try {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    fs.writeFileSync(LANG_CHOICE_FILE, JSON.stringify({ language }, null, 2), "utf8");
+    console.log(`Język strony ustawiony na „${language}” (pierwsze uruchomienie z tłumaczeniami).`);
+  } catch (error) {
+    console.error("Język: nie da się zapisać wyboru:", error.message);
+  }
+}
+ensureLanguageChoice();
+
+function currentLanguage() {
+  const code = String(readJsonOrEmpty(LANG_CHOICE_FILE).language || "").trim();
+  return LANG_CODE_RE.test(code) ? code : LANG_BASE;
+}
+
+// Formaty i jednostki (Etap 7) — podawane stronie w /lang.js (stałe wyżej, przy AUTO_LOGOUT_CHOICES).
+function dashboardFormats() {
+  const settings = loadDashboardSettings();
+  return {
+    dateFormat: settings.dateFormat || "auto",
+    decimal: settings.decimal || "auto",
+    temperatureUnit: settings.temperatureUnit || "c",
+    timeZone: settings.timeZone || ""
+  };
+}
+
+// Skrypt z napisami wczytywany przed resztą strony (index.html, Zaplecze) — bez czekania i mignięcia.
+app.get("/lang.js", (req, res) => {
+  const code = currentLanguage();
+  const payload = {
+    code,
+    formats: dashboardFormats(),
+    base: languageLayer(LANG_BASE),
+    shipped: code === LANG_BASE ? {} : languageLayer(code),
+    user: code === LANG_BASE ? {} : readJsonOrEmpty(path.join(LANG_USER_DIR, `${code}.json`))
+  };
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.type("application/javascript");
+  // "<" zamieniane, żeby tekst tłumaczenia nie mógł zamknąć znacznika <script>.
+  res.send(`window.IF_LANG = ${JSON.stringify(payload).replace(/</g, "\\u003c")};\n`);
+});
+
+// Wzór angielski do pobrania (moduł „Tłumacz” → „Pobierz wzór — English”): napisy strony i modułów razem.
+app.get("/lang-en.json", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Content-Disposition", 'attachment; filename="en.json"');
+  res.type("application/json");
+  res.send(JSON.stringify(languageLayer(LANG_BASE), null, 2) + "\n");
+});
+
+// Lista języków do wyboru (Ustawienia ogólne): angielski bazowy, dostarczone ze stroną, własne użytkownika.
+// Nazwa języka z `_meta.name` pliku (w tym języku, np. „Polski”), inaczej kod.
+function languageFiles(dir) {
+  try {
+    return fs.readdirSync(dir)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => file.slice(0, -5))
+      .filter((code) => LANG_CODE_RE.test(code));
+  } catch {
+    return [];
+  }
+}
+
+function availableLanguages() {
+  const list = new Map();
+  const add = (code, file, kind) => {
+    const name = String(readJsonOrEmpty(file)?._meta?.name || "").trim();
+    const known = list.get(code);
+    if (known) {
+      if (!known.name && name) known.name = name;
+      known.user = known.user || kind === "user";
+      return;
+    }
+    list.set(code, { code, name: name || code, base: code === LANG_BASE, shipped: kind === "shipped", user: kind === "user" });
+  };
+  add(LANG_BASE, path.join(LANG_DEFAULTS_DIR, `${LANG_BASE}.json`), "base");
+  languageFiles(LANG_DEFAULTS_DIR).forEach((code) => add(code, path.join(LANG_DEFAULTS_DIR, `${code}.json`), "shipped"));
+  languageFiles(LANG_USER_DIR).forEach((code) => add(code, path.join(LANG_USER_DIR, `${code}.json`), "user"));
+  return [...list.values()];
+}
+
+app.get("/api/languages", requirePin, (req, res) => {
+  res.json({ ok: true, current: currentLanguage(), languages: availableLanguages() });
+});
+
+// Treść jednego języka dla modułu „Tłumacz”: dostarczona ze stroną i własna użytkownika (osobno).
+app.get("/api/languages/:code", requirePin, (req, res) => {
+  const code = String(req.params.code || "");
+  if (!availableLanguages().some((lang) => lang.code === code)) {
+    return apiError(res, 404, "language_unknown", `Nie ma takiego języka: ${code || "—"}.`, { code: code || "—" });
+  }
+  res.json({
+    ok: true,
+    code,
+    shipped: code === LANG_BASE ? {} : languageLayer(code),
+    user: code === LANG_BASE ? {} : readJsonOrEmpty(path.join(LANG_USER_DIR, `${code}.json`))
+  });
+});
+
+// Zapis tłumaczeń z edytora (moduł „Tłumacz”) do CONFIG_DIR/langs/<kod>.json — dane strony, aktualizacja
+// ich nie rusza. Przychodzą tylko zmiany: { changes: { "grupa.sekcja.nazwa": "tekst" | null } }.
+// Pusty tekst albo null usuwa własne tłumaczenie (wraca tłumaczenie dostarczone, a bez niego angielski);
+// tekst taki sam jak dostarczony też nie jest zapisywany. Dozwolone tylko etykiety z angielskiego
+// pliku bazowego oraz formy liczby mnogiej napisów, które mają ją w angielskim (np. _few, _many po polsku).
+const PLURAL_FORMS = ["zero", "one", "two", "few", "many", "other"];
+
+function languageKeyAllowed(base, key) {
+  const match = /^([a-z]+)\.([a-z0-9_]+)\.([a-z0-9_]+)$/.exec(key);
+  if (!match || match[2].startsWith("_") || match[3].startsWith("_")) return false;
+  const section = base?.[match[1]]?.[match[2]];
+  if (!section || typeof section !== "object") return false;
+  if (typeof section[match[3]] === "string") return true;
+  const plural = /^(.+)_(zero|one|two|few|many|other)$/.exec(match[3]);
+  return Boolean(plural && typeof section[`${plural[1]}_other`] === "string");
+}
+
+app.put("/api/languages/:code", requirePin, (req, res) => {
+  const code = String(req.params.code || "");
+  if (code === LANG_BASE) {
+    return apiError(res, 400, "language_base_locked", "Angielski jest językiem bazowym — nie można go zmieniać.");
+  }
+  if (!availableLanguages().some((lang) => lang.code === code)) {
+    return apiError(res, 404, "language_unknown", `Nie ma takiego języka: ${code || "—"}.`, { code: code || "—" });
+  }
+  const changes = req.body?.changes;
+  if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
+    return apiError(res, 400, "language_no_changes", "Brak zmian do zapisania.");
+  }
+  const base = languageLayer(LANG_BASE);
+  const shipped = languageLayer(code);
+  const file = path.join(LANG_USER_DIR, `${code}.json`);
+  const user = readJsonOrEmpty(file);
+  let saved = 0;
+  for (const [key, value] of Object.entries(changes)) {
+    if (!languageKeyAllowed(base, key)) {
+      return apiError(res, 400, "language_bad_key", `Nieznany napis: ${key}.`, { key });
+    }
+    // Bez obcinania spacji: niektóre napisy zaczynają się nią celowo (np. „ | Przykłady…”).
+    const text = typeof value === "string" && value.trim() ? value : "";
+    if (text.length > 4000) {
+      return apiError(res, 400, "language_text_too_long", `Za długi tekst: ${key}.`, { key });
+    }
+    const [group, section, name] = key.split(".");
+    const shippedText = shipped?.[group]?.[section]?.[name];
+    if (!text || text === shippedText) {
+      if (user?.[group]?.[section]) delete user[group][section][name];
+    } else {
+      user[group] ||= {};
+      user[group][section] ||= {};
+      user[group][section][name] = text;
+    }
+    saved++;
+  }
+  // Puste sekcje i grupy nie zostają w pliku.
+  for (const group of Object.keys(user)) {
+    if (group.startsWith("_") || !user[group] || typeof user[group] !== "object") continue;
+    for (const section of Object.keys(user[group])) {
+      if (user[group][section] && typeof user[group][section] === "object" && !Object.keys(user[group][section]).length) delete user[group][section];
+    }
+    if (!Object.keys(user[group]).length) delete user[group];
+  }
+  user._meta = { ...(user._meta || {}), code, name: user._meta?.name || shipped?._meta?.name || code };
+  try {
+    fs.mkdirSync(LANG_USER_DIR, { recursive: true });
+    const hasTexts = Object.keys(user).some((key) => !key.startsWith("_"));
+    // Język dostarczony ze stroną bez żadnej Twojej zmiany — pusty plik zmian nie jest potrzebny.
+    if (!hasTexts && Object.keys(shipped).length) {
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+      return res.json({ ok: true, code, saved, user: {} });
+    }
+    fs.writeFileSync(file, JSON.stringify(user, null, 2) + "\n", "utf8");
+  } catch (error) {
+    console.error("Język: nie da się zapisać tłumaczenia:", error.message);
+    return apiError(res, 500, "language_save_failed", "Nie udało się zapisać tłumaczenia.");
+  }
+  res.json({ ok: true, code, saved, user });
+});
+
+// Nowy język (moduł „Tłumacz”): pusty plik CONFIG_DIR/langs/<kod>.json z nazwą — napisy dopisuje edytor
+// albo wgrany plik. Kod: 2–3 małe litery, opcjonalnie odmiana (np. de, pt-BR).
+app.post("/api/languages", requirePin, (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  const name = normalizeText(req.body?.name).slice(0, 60);
+  if (!LANG_CODE_RE.test(code)) {
+    return apiError(res, 400, "language_bad_code", "Kod języka: 2–3 małe litery, np. de albo pt-BR.");
+  }
+  if (!name) return apiError(res, 400, "language_no_name", "Wpisz nazwę języka.");
+  if (availableLanguages().some((lang) => lang.code === code)) {
+    return apiError(res, 400, "language_exists", `Język ${code} już jest.`, { code });
+  }
+  try {
+    fs.mkdirSync(LANG_USER_DIR, { recursive: true });
+    fs.writeFileSync(path.join(LANG_USER_DIR, `${code}.json`), JSON.stringify({ _meta: { code, name } }, null, 2) + "\n", "utf8");
+  } catch (error) {
+    console.error("Język: nie da się utworzyć pliku:", error.message);
+    return apiError(res, 500, "language_save_failed", "Nie udało się zapisać tłumaczenia.");
+  }
+  res.json({ ok: true, code });
+});
+
+// Wgranie pliku języka (np. przetłumaczonego poza stroną wzoru en.json). Kod i nazwa z `_meta`
+// pliku albo z formularza. Brane są tylko znane napisy (jak w edytorze); reszta pomijana i liczona.
+// Plik zastępuje własne tłumaczenie tego języka; przy języku dostarczonym ze stroną zostają tylko
+// napisy różne od dostarczonych.
+app.post("/api/languages/import", requirePin, (req, res) => {
+  const content = req.body?.content;
+  if (!content || typeof content !== "object" || Array.isArray(content)) {
+    return apiError(res, 400, "language_bad_file", "To nie jest plik języka (JSON z grupami page, admin, mods).");
+  }
+  const code = String(req.body?.code || content._meta?.code || "").trim();
+  if (!LANG_CODE_RE.test(code)) {
+    return apiError(res, 400, "language_bad_code", "Kod języka: 2–3 małe litery, np. de albo pt-BR.");
+  }
+  if (code === LANG_BASE) {
+    return apiError(res, 400, "language_base_locked", "Angielski jest językiem bazowym — nie można go zmieniać.");
+  }
+  const base = languageLayer(LANG_BASE);
+  const shipped = languageLayer(code);
+  const user = {};
+  let imported = 0;
+  let skipped = 0;
+  let untranslated = 0;   // tekst taki sam jak angielski (np. nieprzetłumaczony wiersz wzoru) — strona i tak pokaże angielski
+  for (const [group, sections] of Object.entries(content)) {
+    if (group.startsWith("_") || !sections || typeof sections !== "object") continue;
+    for (const [section, entries] of Object.entries(sections)) {
+      if (section.startsWith("_") || !entries || typeof entries !== "object") continue;
+      for (const [name, value] of Object.entries(entries)) {
+        if (name.startsWith("_")) continue;
+        const key = `${group}.${section}.${name}`;
+        const text = typeof value === "string" && value.trim() ? value : "";
+        if (!languageKeyAllowed(base, key) || !text || text.length > 4000) { skipped++; continue; }
+        if (text === shipped?.[group]?.[section]?.[name]) continue;
+        if (text === base?.[group]?.[section]?.[name]) { untranslated++; continue; }
+        user[group] ||= {};
+        user[group][section] ||= {};
+        user[group][section][name] = text;
+        imported++;
+      }
+    }
+  }
+  const name = normalizeText(req.body?.name || content._meta?.name).slice(0, 60) || shipped?._meta?.name || code;
+  user._meta = { code, name };
+  try {
+    fs.mkdirSync(LANG_USER_DIR, { recursive: true });
+    const file = path.join(LANG_USER_DIR, `${code}.json`);
+    if (fs.existsSync(file)) moveLanguageToDeleted(code);   // poprzednia wersja nie przepada
+    fs.writeFileSync(file, JSON.stringify(user, null, 2) + "\n", "utf8");
+  } catch (error) {
+    console.error("Język: nie da się zapisać wgranego pliku:", error.message);
+    return apiError(res, 500, "language_save_failed", "Nie udało się zapisać tłumaczenia.");
+  }
+  res.json({ ok: true, code, imported, skipped, untranslated });
+});
+
+function moveLanguageToDeleted(code) {
+  const trash = path.join(LANG_USER_DIR, "deleted");
+  fs.mkdirSync(trash, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  fs.renameSync(path.join(LANG_USER_DIR, `${code}.json`), path.join(trash, `${code}-${stamp}.json`));
+}
+
+// Usunięcie własnego tłumaczenia: plik nie znika, tylko trafia do CONFIG_DIR/langs/deleted/
+// (z datą w nazwie). Przy języku dostarczonym ze stroną usuwa tylko Twoje zmiany.
+// Usunięty wybrany język bez wersji dostarczonej → strona wraca do angielskiego.
+app.delete("/api/languages/:code", requirePin, (req, res) => {
+  const code = String(req.params.code || "");
+  const file = path.join(LANG_USER_DIR, `${code}.json`);
+  if (!LANG_CODE_RE.test(code) || code === LANG_BASE || !fs.existsSync(file)) {
+    return apiError(res, 404, "language_nothing_to_delete", "Ten język nie ma własnego tłumaczenia do usunięcia.");
+  }
+  try {
+    moveLanguageToDeleted(code);
+    if (currentLanguage() === code && !fs.existsSync(path.join(LANG_DEFAULTS_DIR, `${code}.json`))) {
+      fs.writeFileSync(LANG_CHOICE_FILE, JSON.stringify({ language: LANG_BASE }, null, 2), "utf8");
+    }
+  } catch (error) {
+    console.error("Język: nie da się usunąć tłumaczenia:", error.message);
+    return apiError(res, 500, "language_delete_failed", "Nie udało się usunąć tłumaczenia.");
+  }
+  res.json({ ok: true, code, current: currentLanguage() });
+});
+
+app.put("/api/language", requirePin, (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  if (!availableLanguages().some((lang) => lang.code === code)) {
+    return apiError(res, 400, "language_unknown", `Nie ma takiego języka: ${code || "—"}.`, { code: code || "—" });
+  }
+  try {
+    fs.writeFileSync(LANG_CHOICE_FILE, JSON.stringify({ language: code }, null, 2), "utf8");
+  } catch (error) {
+    console.error("Język: nie da się zapisać wyboru:", error.message);
+    return apiError(res, 500, "language_save_failed", "Nie udało się zapisać wyboru języka.");
+  }
+  res.json({ ok: true, current: code });
+});
+
 // Pliki CSS trybów: najpierw wersja użytkownika z CONFIG_DIR, inaczej domyślna.
 app.get("/custom/:file", (req, res) => {
   const match = /^custom-(d|n)\.css$/.exec(req.params.file);
@@ -1473,7 +1904,7 @@ app.get("/api/dashboard/custom-css", (req, res) => {
 app.put("/api/dashboard/custom-css", requirePin, (req, res) => {
   const mode = req.body?.mode;
   if (!CUSTOM_MODES[mode]) {
-    return res.status(400).json({ error: "Nieznany tryb (dozwolone: d, n)." });
+    return apiError(res, 400, "mode_unknown", "Nieznany tryb (dozwolone: d, n).");
   }
 
   if (req.body?.reset) {
@@ -1572,7 +2003,7 @@ app.get("/api/admin/theme", (req, res) => {
 
 app.put("/api/admin/theme", (req, res) => {
   if (!hasValidPin(req)) {
-    return res.status(403).json({ error: "Niepoprawny PIN" });
+    return apiError(res, 403, "pin_invalid", "Niepoprawny PIN");
   }
   const mode = adminThemeMode(req.body?.mode);
   if (req.body?.reset) {
@@ -1588,7 +2019,7 @@ app.put("/api/admin/theme", (req, res) => {
       theme.backgroundUrl = saveAdminBackground(backgroundData);
     }
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return apiError(res, 400, "bg_bad_format", error.message);
   }
   saveAdminTheme(mode, theme);
   res.json({ success: true, mode, theme });
@@ -1668,7 +2099,7 @@ app.get("/api/kiosk/settings", (req, res) => {
 
 app.put("/api/kiosk/settings", (req, res) => {
   if (!hasValidPin(req)) {
-    return res.status(403).json({ error: "Niepoprawny PIN" });
+    return apiError(res, 403, "pin_invalid", "Niepoprawny PIN");
   }
 
   const current = loadKioskSettings();
@@ -1719,7 +2150,7 @@ function cleanPageIcon(raw) {
 app.post("/api/services/page", requirePin, (req, res) => {
   const data = loadServices();
   const name = normalizeText(req.body?.name).slice(0, 60);
-  if (!name) return res.status(400).json({ error: "Podaj nazwę strony." });
+  if (!name) return apiError(res, 400, "page_name_missing", "Podaj nazwę strony.");
   const pageIcon = cleanPageIcon(req.body?.icon);
   if (pageIcon.error) return res.status(400).json({ error: pageIcon.error });
   const page = { id: createId(), name };
@@ -1733,8 +2164,8 @@ app.put("/api/services/page/:id", requirePin, (req, res) => {
   const data = loadServices();
   const page = data.pages.find((item) => item.id === req.params.id);
   const name = normalizeText(req.body?.name).slice(0, 60);
-  if (!page) return res.status(404).json({ error: "Strona nie istnieje." });
-  if (!name) return res.status(400).json({ error: "Podaj nazwę strony." });
+  if (!page) return apiError(res, 404, "page_not_found", "Strona nie istnieje.");
+  if (!name) return apiError(res, 400, "page_name_missing", "Podaj nazwę strony.");
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, "icon")) {
     const pageIcon = cleanPageIcon(req.body.icon);
     if (pageIcon.error) return res.status(400).json({ error: pageIcon.error });
@@ -1750,8 +2181,8 @@ app.put("/api/services/page/:id/move", requirePin, (req, res) => {
   const data = loadServices();
   const index = data.pages.findIndex((item) => item.id === req.params.id);
   const direction = normalizeText(req.body?.direction);
-  if (index === -1) return res.status(404).json({ error: "Strona nie istnieje." });
-  if (!["up", "down"].includes(direction)) return res.status(400).json({ error: "Niepoprawny kierunek" });
+  if (index === -1) return apiError(res, 404, "page_not_found", "Strona nie istnieje.");
+  if (!["up", "down"].includes(direction)) return apiError(res, 400, "direction_invalid", "Niepoprawny kierunek");
   const target = direction === "up" ? index - 1 : index + 1;
   // Home zostaje zawsze na górze.
   if (target >= 1 && target < data.pages.length && index >= 1) {
@@ -1764,12 +2195,12 @@ app.put("/api/services/page/:id/move", requirePin, (req, res) => {
 // Usunięcie strony nie usuwa kafelków — jej sekcje przechodzą na Home.
 app.delete("/api/services/page/:id", requirePin, (req, res) => {
   if (req.params.id === HOME_PAGE_ID) {
-    return res.status(400).json({ error: "Strony Home nie można usunąć (można zmienić jej nazwę)." });
+    return apiError(res, 400, "page_home_delete", "Strony Home nie można usunąć (można zmienić jej nazwę).");
   }
   const data = loadServices();
   const before = data.pages.length;
   data.pages = data.pages.filter((item) => item.id !== req.params.id);
-  if (data.pages.length === before) return res.status(404).json({ error: "Strona nie istnieje." });
+  if (data.pages.length === before) return apiError(res, 404, "page_not_found", "Strona nie istnieje.");
   let moved = 0;
   data.sections.forEach((section) => {
     if (section.pageId === req.params.id) {
@@ -1786,7 +2217,7 @@ app.post("/api/services/section", requirePin, (req, res) => {
   const name = normalizeText(req.body.name);
 
   if (!name) {
-    return res.status(400).json({ error: "Brak nazwy sekcji" });
+    return apiError(res, 400, "section_name_missing", "Brak nazwy sekcji");
   }
 
   // Ikona sekcji (Lucide, opcjonalna) — ta sama kontrola co ikona strony.
@@ -1821,11 +2252,11 @@ app.put("/api/services/section/:id", requirePin, (req, res) => {
   const name = normalizeText(req.body.name);
 
   if (!section) {
-    return res.status(404).json({ error: "Sekcja nie istnieje" });
+    return apiError(res, 404, "section_not_found", "Sekcja nie istnieje");
   }
 
   if (!name) {
-    return res.status(400).json({ error: "Brak nazwy sekcji" });
+    return apiError(res, 400, "section_name_missing", "Brak nazwy sekcji");
   }
 
   // Ikona zmienia się tylko, gdy przyszła w zapytaniu (przeniesienie na inną stronę jej nie wysyła).
@@ -1854,11 +2285,11 @@ app.put("/api/services/section/:id/move", requirePin, (req, res) => {
   const direction = normalizeText(req.body.direction);
 
   if (sectionIndex === -1) {
-    return res.status(404).json({ error: "Sekcja nie istnieje" });
+    return apiError(res, 404, "section_not_found", "Sekcja nie istnieje");
   }
 
   if (!["up", "down"].includes(direction)) {
-    return res.status(400).json({ error: "Niepoprawny kierunek" });
+    return apiError(res, 400, "direction_invalid", "Niepoprawny kierunek");
   }
 
   // Zamiana z sąsiednią sekcją na tej samej stronie.
@@ -1889,7 +2320,7 @@ app.put("/api/services/link/:id/move", requirePin, (req, res) => {
   const direction = normalizeText(req.body.direction);
 
   if (!["up", "down"].includes(direction)) {
-    return res.status(400).json({ error: "Niepoprawny kierunek (dozwolone: up, down)" });
+    return apiError(res, 400, "direction_invalid", "Niepoprawny kierunek (dozwolone: up, down)");
   }
 
   let found = false;
@@ -1915,7 +2346,7 @@ app.put("/api/services/link/:id/move", requirePin, (req, res) => {
   }
 
   if (!found) {
-    return res.status(404).json({ error: "Link nie istnieje" });
+    return apiError(res, 404, "link_not_found", "Link nie istnieje");
   }
 
   res.json({ success: true, sections: data.sections });
@@ -1936,13 +2367,13 @@ app.post("/api/services/link", requirePin, (req, res) => {
   const description = normalizeText(req.body.description);
 
   if (!sectionId || !name || !url) {
-    return res.status(400).json({ error: "Brakuje danych linku" });
+    return apiError(res, 400, "link_data_missing", "Brakuje danych linku");
   }
 
   const section = data.sections.find(item => item.id === sectionId);
 
   if (!section) {
-    return res.status(404).json({ error: "Sekcja nie istnieje" });
+    return apiError(res, 404, "section_not_found", "Sekcja nie istnieje");
   }
 
   if (!Array.isArray(section.groups)) {
@@ -1990,7 +2421,7 @@ app.put("/api/services/link/:id", requirePin, (req, res) => {
   const description = normalizeText(req.body.description);
 
   if (!sectionId || !name || !url) {
-    return res.status(400).json({ error: "Brakuje danych linku" });
+    return apiError(res, 400, "link_data_missing", "Brakuje danych linku");
   }
 
   let foundLink = null;
@@ -2011,13 +2442,13 @@ app.put("/api/services/link/:id", requirePin, (req, res) => {
   });
 
   if (!foundLink) {
-    return res.status(404).json({ error: "Link nie istnieje" });
+    return apiError(res, 404, "link_not_found", "Link nie istnieje");
   }
 
   const targetSection = data.sections.find(section => section.id === sectionId);
 
   if (!targetSection) {
-    return res.status(404).json({ error: "Sekcja nie istnieje" });
+    return apiError(res, 404, "section_not_found", "Sekcja nie istnieje");
   }
 
   if (!Array.isArray(targetSection.groups)) {
@@ -2082,11 +2513,8 @@ app.post("/api/ports/check", requirePin, async (req, res) => {
   const port = Number(req.body.port);
 
   if (!host || !isValidPort(port)) {
-    return res.status(400).json({
-      ok: false,
-      status: "invalid-data",
-      message: "Brakuje hosta albo poprawnego portu z zakresu 1-65535."
-    });
+    const text = "Brakuje hosta albo poprawnego portu z zakresu 1-65535.";
+    return apiError(res, 400, "port_invalid", text, {}, { status: "invalid-data", message: text });
   }
 
   try {
@@ -2100,13 +2528,8 @@ app.post("/api/ports/check", requirePin, async (req, res) => {
   } catch (error) {
     console.error("Port check error:", error);
 
-    return res.status(500).json({
-      ok: false,
-      status: "check-error",
-      host,
-      port,
-      message: "Nie udało się sprawdzić portu."
-    });
+    const text = "Nie udało się sprawdzić portu.";
+    return apiError(res, 500, "port_check_failed", text, {}, { status: "check-error", host, port, message: text });
   }
 });
 
@@ -2119,7 +2542,8 @@ app.get("/api/system/stats", async (req, res) => {
     console.error("System stats error:", error.message);
     return res.status(500).json({
       ok: false,
-      message: "Nie udało się pobrać statystyk systemu."
+      message: "Nie udało się pobrać statystyk systemu.",
+      code: "stats_failed", vars: {}
     });
   }
 });
@@ -2133,7 +2557,8 @@ app.get("/api/system/top", async (req, res) => {
     console.error("System top stats error:", error.message);
     return res.status(500).json({
       ok: false,
-      message: "Nie udało się pobrać szczegółowych statystyk systemu."
+      message: "Nie udało się pobrać szczegółowych statystyk systemu.",
+      code: "top_failed", vars: {}
     });
   }
 });
@@ -2195,6 +2620,7 @@ async function collectVersions({ force = false } = {}) {
       installedVersion,
       local,
       note: imageNote(c.image),
+      noteCode: imageNoteCode(c.image),
       changelogUrl: local ? null : changelogUrl(c.image),
       backups: listComposeBackups(stack).length
     };
@@ -2321,64 +2747,16 @@ function setServiceImageTag(original, service, newTag) {
   return { text: out.join("\n"), updated };
 }
 
-app.post("/api/docker/update-compose", requirePin, async (req, res) => {
-  try {
-    const container = normalizeText(req.body?.container);
-    const newTag = normalizeText(req.body?.tag);
-
-    if (DOCKER_VERSION_EXCLUDE.has(container)) {
-      return res.status(400).json({ ok: false, message: "Ten kontener jest wykluczony z aktualizacji przez ten panel." });
-    }
-
-    if (!newTag || !isStableTag(newTag)) {
-      return res.status(400).json({ ok: false, message: "Niepoprawny numer wersji." });
-    }
-
-    const { stack, service } = await containerStackAndService(container);
-    if (!isSafeName(stack) || !isSafeName(service)) {
-      return res.status(400).json({ ok: false, message: "Niepoprawna nazwa kontenera lub stosu." });
-    }
-    const composePath = findComposeFile(stack);
-
-    if (!composePath) {
-      return res.status(404).json({
-        ok: false,
-        message: `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}. Sprawdź, czy w compose.yaml IF-startpage jest wolumen "/home/{user}/docker/app:/host-apps" ({user} — twoja nazwa użytkownika).`
-      });
-    }
-
-    const original = fs.readFileSync(composePath, "utf8");
-    const { text, updated } = setServiceImageTag(original, service, newTag);
-
-    if (!updated) {
-      return res.status(404).json({
-        ok: false,
-        message: `Nie znaleziono linii "image:" dla serwisu "${service}" w ${stack}/${path.basename(composePath)}.`
-      });
-    }
-
-    backupCompose(stack, composePath);
-    fs.writeFileSync(composePath, text, "utf8");
-
-    res.json({
-      ok: true,
-      message: `Zapisano tag "${newTag}" w ${stack}/${path.basename(composePath)} (serwis "${service}"). Restart stosu w Dockge, żeby zastosować zmianę.`
-    });
-  } catch (error) {
-    res.status(500).json({ ok: false, message: error.message });
-  }
-});
-
 // „Cofnij” — przywraca compose.yaml z ostatniej kopii (kopia znika, więc kolejne „Cofnij” idzie dalej wstecz).
 app.post("/api/docker/compose-restore", requirePin, async (req, res) => {
   try {
     const container = normalizeText(req.body?.container);
     const { stack } = await containerStackAndService(container);
-    if (!isSafeName(stack)) return res.status(400).json({ ok: false, message: "Niepoprawna nazwa stosu." });
+    if (!isSafeName(stack)) return apiError(res, 400, "stack_bad_name", "Niepoprawna nazwa stosu.");
     const composePath = findComposeFile(stack);
-    if (!composePath) return res.status(404).json({ ok: false, message: `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}.` });
+    if (!composePath) return apiError(res, 404, "compose_not_found", `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}.`, { path: path.join(HOST_APPS_DIR, stack) });
     const backups = listComposeBackups(stack);
-    if (!backups.length) return res.status(404).json({ ok: false, message: `Brak kopii compose.yaml dla „${stack}”.` });
+    if (!backups.length) return apiError(res, 404, "compose_no_backup", `Brak kopii compose.yaml dla „${stack}”.`, { stack });
     const latest = path.join(composeBackupDir(stack), backups[backups.length - 1]);
     const restored = fs.readFileSync(latest, "utf8");
     const imageLine = (restored.match(/^\s*image:\s*(\S+)/m) || [])[1] || "";
@@ -2386,7 +2764,9 @@ app.post("/api/docker/compose-restore", requirePin, async (req, res) => {
     fs.unlinkSync(latest);
     res.json({
       ok: true,
-      message: `Przywrócono compose.yaml stosu „${stack}” z kopii ${backups[backups.length - 1].slice(13)}${imageLine ? ` (obraz ${imageLine})` : ""}. Zrób „Aktualizuj” w Dockge, żeby uruchomić tę wersję.`
+      message: `Przywrócono compose.yaml stosu „${stack}” z kopii ${backups[backups.length - 1].slice(13)}${imageLine ? ` (obraz ${imageLine})` : ""}. Zrób „Aktualizuj” w Dockge, żeby uruchomić tę wersję.`,
+      code: imageLine ? "compose_restored_image" : "compose_restored",
+      vars: { stack, copy: backups[backups.length - 1].slice(13), image: imageLine || "" }
     });
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message });
@@ -2454,13 +2834,13 @@ app.get("/api/icons", (req, res) => {
 
 app.post("/api/icons", requirePin, (req, res) => {
   const name = cleanIconName(req.body?.name);
-  if (!name) return res.status(400).json({ error: "Dozwolone pliki: PNG, SVG, WebP, JPG, ICO." });
+  if (!name) return apiError(res, 400, "icon_type", "Dozwolone pliki: PNG, SVG, WebP, JPG, ICO.");
   const match = String(req.body?.data || "").match(/^data:[^;,]*;base64,(.+)$/);
-  if (!match) return res.status(400).json({ error: `${name}: nieprawidłowe dane pliku.` });
+  if (!match) return apiError(res, 400, "icon_bad_data", `${name}: nieprawidłowe dane pliku.`, { name });
   const buffer = Buffer.from(match[1], "base64");
-  if (!buffer.length || buffer.length > ICON_MAX_BYTES) return res.status(400).json({ error: `${name}: plik pusty albo większy niż 2 MB.` });
+  if (!buffer.length || buffer.length > ICON_MAX_BYTES) return apiError(res, 400, "icon_size", `${name}: plik pusty albo większy niż 2 MB.`, { name });
   const target = path.join(ICONS_DIR, name);
-  if (fs.existsSync(target) && !req.body?.overwrite) return res.status(409).json({ error: `${name}: taka ikona już jest.`, exists: true, name });
+  if (fs.existsSync(target) && !req.body?.overwrite) return apiError(res, 409, "icon_exists", `${name}: taka ikona już jest.`, { name }, { exists: true, name });
   try {
     fs.mkdirSync(ICONS_DIR, { recursive: true });
     fs.writeFileSync(target, buffer, { mode: 0o644 });
@@ -2473,7 +2853,7 @@ app.post("/api/icons", requirePin, (req, res) => {
     } catch {}
     res.json({ success: true, name });
   } catch (error) {
-    res.status(500).json({ error: `${name}: nie udało się zapisać (${error.message}).` });
+    apiError(res, 500, "icon_save_failed", `${name}: nie udało się zapisać (${error.message}).`, { name, error: error.message });
   }
 });
 
@@ -2484,7 +2864,7 @@ app.get("/api/alerts/temperature-thresholds", (req, res) => {
 
 app.put("/api/alerts/temperature-thresholds", requirePin, (req, res) => {
   const input = req.body?.sensors;
-  if (!input || typeof input !== "object") return res.status(400).json({ error: "Brak progów do zapisania." });
+  if (!input || typeof input !== "object") return apiError(res, 400, "thresholds_missing", "Brak progów do zapisania.");
   const known = new Map(readAllTemperatures().map((sensor) => [sensor.id, sensor]));
   const saved = loadTempThresholds();
   for (const [id, value] of Object.entries(input)) {
@@ -2493,10 +2873,10 @@ app.put("/api/alerts/temperature-thresholds", requirePin, (req, res) => {
     const warn = Number(value?.warn);
     const alarm = Number(value?.alarm);
     if (!Number.isFinite(warn) || !Number.isFinite(alarm) || warn < 1 || alarm > 150) {
-      return res.status(400).json({ error: `${sensor.name}: progi muszą być liczbami od 1 do 150 °C.` });
+      return apiError(res, 400, "temp_threshold_range", `${sensor.name}: progi muszą być liczbami od 1 do 150 °C.`, { sensor: sensor.name, sensorParts: sensor.nameParts, min: "1°C", max: "150°C" });
     }
     if (alarm <= warn) {
-      return res.status(400).json({ error: `${sensor.name}: próg alarmu musi być wyższy niż próg uwagi.` });
+      return apiError(res, 400, "temp_threshold_order", `${sensor.name}: próg alarmu musi być wyższy niż próg uwagi.`, { sensor: sensor.name, sensorParts: sensor.nameParts });
     }
     // Progi równe domyślnym nie są zapisywane — wtedy czujnik idzie za domyślnymi.
     if (warn === sensor.defaultWarn && alarm === sensor.defaultAlarm) delete saved[id];
@@ -2523,10 +2903,10 @@ app.put("/api/alerts/load-thresholds", requirePin, (req, res) => {
     const warn = Number(req.body?.[key]?.warn);
     const alarm = Number(req.body?.[key]?.alarm);
     if (!Number.isFinite(warn) || !Number.isFinite(alarm) || warn < 1 || alarm > 100) {
-      return res.status(400).json({ error: `${names[key]}: progi muszą być liczbami od 1 do 100 %.` });
+      return apiError(res, 400, "load_threshold_range", `${names[key]}: progi muszą być liczbami od 1 do 100 %.`, { name: names[key] });
     }
     if (alarm <= warn) {
-      return res.status(400).json({ error: `${names[key]}: próg alarmu musi być wyższy niż próg uwagi.` });
+      return apiError(res, 400, "load_threshold_order", `${names[key]}: próg alarmu musi być wyższy niż próg uwagi.`, { name: names[key] });
     }
     if (warn !== LOAD_DEFAULTS[key].warn || alarm !== LOAD_DEFAULTS[key].alarm) saved[key] = { warn, alarm };
   }
@@ -2572,6 +2952,7 @@ app.get("/api/alerts/summary", async (req, res) => {
             severity,
             title: `Kontener: ${c.name}`,
             message: `Stan: ${c.state || "nieznany"} (${c.status || "brak statusu"})`,
+            code: "container_problem", vars: { name: c.name, state: c.state || "", status: c.status || "" },
             resource: c.name,
             timestamp: new Date().toISOString()
           });
@@ -2585,6 +2966,7 @@ app.get("/api/alerts/summary", async (req, res) => {
         severity: "warning",
         title: "Docker Daemon niedostępny",
         message: `Błąd komunikacji z Dockerem: ${dockerErr.message}`,
+        code: "docker_unavailable", vars: { error: dockerErr.message },
         resource: "docker",
         timestamp: new Date().toISOString()
       });
@@ -2603,6 +2985,8 @@ app.get("/api/alerts/summary", async (req, res) => {
           severity: isAlarm ? "critical" : "warning",
           title: `Temperatura: ${sensor.name}`,
           message: `${Math.round(sensor.temp)}°C — ${isAlarm ? `alarm od ${sensor.alarm}°C` : `uwaga od ${sensor.warn}°C`}`,
+          code: isAlarm ? "temp_alarm" : "temp_warn",
+          vars: { temp: Math.round(sensor.temp), limit: isAlarm ? sensor.alarm : sensor.warn }, sensor: sensor.nameParts,
           resource: sensor.name,
           timestamp: new Date().toISOString()
         });
@@ -2616,6 +3000,7 @@ app.get("/api/alerts/summary", async (req, res) => {
           severity: "warning",
           title: "Wysokie zużycie pamięci RAM",
           message: `Zajętość pamięci RAM wynosi ${Math.round(memPct)}%`,
+          code: "ram_high", vars: { percent: Math.round(memPct) },
           resource: "ram",
           timestamp: new Date().toISOString()
         });
@@ -2631,6 +3016,7 @@ app.get("/api/alerts/summary", async (req, res) => {
             severity: diskPct >= 95 ? "critical" : "warning",
             title: `Brak miejsca na dysku (${d.mount || d.filesystem})`,
             message: `Zajętość partycji wynosi ${diskPct}% (${d.used || ""} / ${d.size || ""})`,
+            code: "disk_full", vars: { mount: d.mount || d.filesystem, percent: diskPct, used: d.used || "", size: d.size || "" }, mountRoot: Boolean(d.mountRoot),
             resource: d.mount || "disk",
             timestamp: new Date().toISOString()
           });
@@ -2661,6 +3047,7 @@ app.get("/api/alerts/summary", async (req, res) => {
           severity: "info",
           title: `Dostępne aktualizacje: ${withUpdates.length}`,
           message: withUpdates.join(", "),
+          code: "updates_available", vars: { n: withUpdates.length, list: withUpdates.join(", ") },
           resource: "updates",
           timestamp: new Date().toISOString()
         });
@@ -2678,6 +3065,8 @@ app.get("/api/alerts/summary", async (req, res) => {
         message: systemUpdates.securityCount
           ? `W tym bezpieczeństwa: ${systemUpdates.securityCount}. Instalacja w Cockpit.`
           : "Instalacja w Cockpit.",
+        code: systemUpdates.securityCount ? "system_updates_security" : "system_updates",
+        vars: { n: systemUpdates.count, security: systemUpdates.securityCount || 0 },
         resource: "system",
         timestamp: new Date().toISOString()
       });
@@ -2717,6 +3106,7 @@ app.get("/api/alerts/summary", async (req, res) => {
         severity: "critical",
         title: "Błąd modułu alertów",
         message: error.message,
+        code: "alerts_error", vars: { error: error.message },
         timestamp: new Date().toISOString()
       }]
     });
@@ -2817,7 +3207,18 @@ app.get("/api/system/if-server", async (req, res) => {
 const APPS_REQUEST_FILE = path.join(CONFIG_DIR, "aplikacje-zlecenie.json");
 const APPS_STATE_FILE = path.join(CONFIG_DIR, "aplikacje-stan.json");
 const APP_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
-const INSTALLER_TZ = "Europe/Warsaw";
+const INSTALLER_TZ_FALLBACK = "Europe/Warsaw";
+
+// Strefa czasowa wpisywana aplikacjom (TZ): z Ustawień ogólnych (Formaty i jednostki), a gdy tam
+// „automatyczna” — strefa przeglądarki, z której instalujesz (tak jak strona pokazuje godzinę);
+// bez niej — Europe/Warsaw, jak w wersjach przed ustawieniem strefy (audyt 11.11.2026).
+function installerTimeZone(browserZone) {
+  const chosen = normalizeText(loadDashboardSettings().timeZone);
+  if (validTimeZone(chosen)) return chosen;
+  const browser = normalizeText(browserZone);
+  if (validTimeZone(browser)) return browser;
+  return INSTALLER_TZ_FALLBACK;
+}
 
 // Folder ~/docker na serwerze: źródło wolumenu /host-apps strony (…/docker/app) bez „/app”.
 let hostDockerDirCache = null;
@@ -2909,13 +3310,16 @@ function looksLikeFile(rel) {
   return !rel.endsWith("/") && /\.[A-Za-z0-9]{1,6}$/.test(last);
 }
 
-async function adaptCompose({ name, compose, env, range, host }) {
+async function adaptCompose({ name, compose, env, range, host, timeZone }) {
+  const tz = installerTimeZone(timeZone);
   const changes = [];
-  const note = (text) => changes.push(text);
+  const changeCodes = [];
+  // text — po polsku (jak dotąd); code + vars — dla tłumaczeń (Zaplecze → Aplikacje → Instalator).
+  const note = (text, code, vars = {}) => { changes.push(text); changeCodes.push({ code, vars }); };
   const doc = YAML.parseDocument(String(compose || ""), { prettyErrors: true });
-  if (doc.errors.length) throw new Error(`Compose ma błąd: ${doc.errors[0].message}`);
+  if (doc.errors.length) throw codedError("compose_error", `Compose ma błąd: ${doc.errors[0].message}`, { error: doc.errors[0].message });
   const services = doc.get("services");
-  if (!YAML.isMap(services) || !services.items.length) throw new Error("W compose nie ma części „services”.");
+  if (!YAML.isMap(services) || !services.items.length) throw codedError("compose_no_services", "W compose nie ma części „services”.");
 
   const appData = `${await hostDockerDir()}/app-data/${name}`;
   let envText = String(env || "");
@@ -2926,7 +3330,7 @@ async function adaptCompose({ name, compose, env, range, host }) {
 
   if (doc.has("version")) {
     doc.delete("version");
-    note("Usunięto przestarzałą linijkę „version” — Docker jej już nie potrzebuje.");
+    note("Usunięto przestarzałą linijkę „version” — Docker jej już nie potrzebuje.", "version_removed");
   }
 
   // Wolumen → pełna ścieżka w app-data/<nazwa>; null = bez zmian.
@@ -2937,7 +3341,7 @@ async function adaptCompose({ name, compose, env, range, host }) {
     if (envRef) {
       const key = envRef[1];
       if (!(key in envValues)) {
-        note(`${serviceName}: ścieżka danych z ${key} — wklej plik .env, żeby ją dostosować.`);
+        note(`${serviceName}: ścieżka danych z ${key} — wklej plik .env, żeby ją dostosować.`, "env_path_needs_env", { service: serviceName, key });
         return null;
       }
       const value = envValues[key];
@@ -2947,17 +3351,17 @@ async function adaptCompose({ name, compose, env, range, host }) {
       const target = `${appData}/${clean}`;
       envText = setEnvValue(envText, key, target);
       envValues[key] = target;
-      note(`.env: ${key} = ${target} (dane w app-data, obejmie je kopia zapasowa).`);
+      note(`.env: ${key} = ${target} (dane w app-data, obejmie je kopia zapasowa).`, "env_path_set", { key, target });
       return null;
     }
     if (src.startsWith(".")) {
       const clean = src.replace(/^\.\//, "").replace(/\/+$/, "");
       if (!clean || clean === "." || clean.includes("..")) return null;
       if (looksLikeFile(clean)) {
-        note(`${serviceName}: plik ${src} zostaje obok compose — wgraj go do folderu aplikacji (app/${name}).`);
+        note(`${serviceName}: plik ${src} zostaje obok compose — wgraj go do folderu aplikacji (app/${name}).`, "file_stays", { service: serviceName, src, name });
         return null;
       }
-      note(`${serviceName}: dane ${src} → ${appData}/${clean}`);
+      note(`${serviceName}: dane ${src} → ${appData}/${clean}`, "data_moved", { service: serviceName, src, target: `${appData}/${clean}` });
       return `${appData}/${clean}`;
     }
     // Wolumen nazwany Dockera — chyba że ma własny sterownik albo jest zewnętrzny.
@@ -2967,7 +3371,7 @@ async function adaptCompose({ name, compose, env, range, host }) {
       return null;
     }
     convertedVolumes.add(src);
-    note(`${serviceName}: dane z ukrytego wolumenu „${src}” → ${appData}/${src} (widać je w plikach, obejmie je kopia zapasowa).`);
+    note(`${serviceName}: dane z ukrytego wolumenu „${src}” → ${appData}/${src} (widać je w plikach, obejmie je kopia zapasowa).`, "volume_moved", { service: serviceName, src, target: `${appData}/${src}` });
     return `${appData}/${src}`;
   };
 
@@ -3003,12 +3407,12 @@ async function adaptCompose({ name, compose, env, range, host }) {
           if (latest && key in envValues) {
             envText = setEnvValue(envText, key, latest);
             envValues[key] = latest;
-            note(`.env: ${key} „${value || "brak"}” → ${latest} (stała wersja — działają aktualizacje).`);
+            note(`.env: ${key} „${value || "brak"}” → ${latest} (stała wersja — działają aktualizacje).`, "env_version", { key, old: value || "", new: latest });
           } else if (latest) {
             svc.set("image", `${ref.slice(0, colon)}:${latest}`);
-            note(`${serviceName}: wersja „${value || "brak"}” → ${latest} (stała wersja — działają aktualizacje).`);
+            note(`${serviceName}: wersja „${value || "brak"}” → ${latest} (stała wersja — działają aktualizacje).`, "version_set", { service: serviceName, old: value || "", new: latest });
           } else {
-            note(`${serviceName}: nie udało się ustalić numeru wersji obrazu — zostaje „${value || "latest"}”.`);
+            note(`${serviceName}: nie udało się ustalić numeru wersji obrazu — zostaje „${value || "latest"}”.`, "version_unknown", { service: serviceName, old: value || "latest" });
           }
         }
       } else if (!tag || tag === "latest") {
@@ -3017,9 +3421,9 @@ async function adaptCompose({ name, compose, env, range, host }) {
         const latest = Array.isArray(found.tags) && found.tags.length ? found.tags[found.tags.length - 1] : null;
         if (latest) {
           svc.set("image", `${repo}:${latest}`);
-          note(`${serviceName}: wersja „${tag || "brak"}” → ${latest} (stała wersja — działają aktualizacje i wiadomo, co jest zainstalowane).`);
+          note(`${serviceName}: wersja „${tag || "brak"}” → ${latest} (stała wersja — działają aktualizacje i wiadomo, co jest zainstalowane).`, "version_pinned", { service: serviceName, old: tag || "", new: latest });
         } else {
-          note(`${serviceName}: nie udało się ustalić numeru wersji obrazu — zostaje „${tag || "latest"}”.`);
+          note(`${serviceName}: nie udało się ustalić numeru wersji obrazu — zostaje „${tag || "latest"}”.`, "version_unknown", { service: serviceName, old: tag || "latest" });
         }
       }
     }
@@ -3027,22 +3431,22 @@ async function adaptCompose({ name, compose, env, range, host }) {
     if (!svc.has("container_name")) {
       const containerName = multi ? `${name}-${serviceName}` : name;
       svc.set("container_name", containerName);
-      note(`${serviceName}: nazwa kontenera „${containerName}” (czytelna w alertach i Statusie).`);
+      note(`${serviceName}: nazwa kontenera „${containerName}” (czytelna w alertach i Statusie).`, "container_name", { service: serviceName, name: containerName });
     }
 
     if (!svc.has("restart")) {
       svc.set("restart", "unless-stopped");
-      note(`${serviceName}: automatyczny start po restarcie serwera (restart: unless-stopped).`);
+      note(`${serviceName}: automatyczny start po restarcie serwera (restart: unless-stopped).`, "restart", { service: serviceName });
     }
 
     const environment = svc.get("environment");
     if (YAML.isMap(environment)) {
-      if (!environment.has("TZ")) { environment.set("TZ", INSTALLER_TZ); note(`${serviceName}: strefa czasowa Polski (TZ).`); }
+      if (!environment.has("TZ")) { environment.set("TZ", tz); note(`${serviceName}: strefa czasowa ${tz} (TZ).`, "timezone", { service: serviceName, tz }); }
     } else if (YAML.isSeq(environment)) {
-      if (!environment.items.some((e) => String(e?.value ?? e).startsWith("TZ="))) { environment.add(`TZ=${INSTALLER_TZ}`); note(`${serviceName}: strefa czasowa Polski (TZ).`); }
+      if (!environment.items.some((e) => String(e?.value ?? e).startsWith("TZ="))) { environment.add(`TZ=${tz}`); note(`${serviceName}: strefa czasowa ${tz} (TZ).`, "timezone", { service: serviceName, tz }); }
     } else if (!environment) {
-      svc.set("environment", doc.createNode({ TZ: INSTALLER_TZ }));
-      note(`${serviceName}: strefa czasowa Polski (TZ).`);
+      svc.set("environment", doc.createNode({ TZ: tz }));
+      note(`${serviceName}: strefa czasowa ${tz} (TZ).`, "timezone", { service: serviceName, tz });
     }
 
     const volumes = svc.get("volumes");
@@ -3072,8 +3476,8 @@ async function adaptCompose({ name, compose, env, range, host }) {
           if (!published) continue;
           if (await isBusy(published)) {
             const free = await freePort();
-            if (free) { note(`${serviceName}: port ${published} zajmuje ${used.get(published) || "inna usługa"} → ${free}.`); entry.set("published", free); taken.add(free); }
-            else note(`${serviceName}: port ${published} jest zajęty, a w zakresie ${range} nie ma wolnego — zmień go ręcznie.`);
+            if (free) { note(`${serviceName}: port ${published} zajmuje ${used.get(published) || "inna usługa"} → ${free}.`, "port_moved", { service: serviceName, port: published, by: used.get(published) || "", free }); entry.set("published", free); taken.add(free); }
+            else note(`${serviceName}: port ${published} jest zajęty, a w zakresie ${range} nie ma wolnego — zmień go ręcznie.`, "port_no_free", { service: serviceName, port: published, range });
           } else taken.add(published);
           continue;
         }
@@ -3082,10 +3486,10 @@ async function adaptCompose({ name, compose, env, range, host }) {
         if (await isBusy(parsed.hostPort)) {
           const free = await freePort();
           if (free) {
-            note(`${serviceName}: port ${parsed.hostPort} zajmuje ${used.get(parsed.hostPort) || "inna usługa"} → ${free}.`);
+            note(`${serviceName}: port ${parsed.hostPort} zajmuje ${used.get(parsed.hostPort) || "inna usługa"} → ${free}.`, "port_moved", { service: serviceName, port: parsed.hostPort, by: used.get(parsed.hostPort) || "", free });
             ports.set(index, formatPortEntry({ ...parsed, hostPort: free }));
             taken.add(free);
-          } else note(`${serviceName}: port ${parsed.hostPort} jest zajęty, a w zakresie ${range} nie ma wolnego — zmień go ręcznie.`);
+          } else note(`${serviceName}: port ${parsed.hostPort} jest zajęty, a w zakresie ${range} nie ma wolnego — zmień go ręcznie.`, "port_no_free", { service: serviceName, port: parsed.hostPort, range });
         } else taken.add(parsed.hostPort);
       }
     }
@@ -3101,13 +3505,14 @@ async function adaptCompose({ name, compose, env, range, host }) {
     compose: doc.toString({ lineWidth: 0 }),
     env: envText,
     changes,
+    changeCodes,
     ports: [...taken].sort((a, b) => a - b)
   };
 }
 
 function installerCheckName(name) {
-  if (!APP_NAME_RE.test(name)) return "Nazwa: małe litery, cyfry, „-” lub „_” (np. immich, paperless-ngx).";
-  if (fs.existsSync(path.join(HOST_APPS_DIR, name))) return `Aplikacja „${name}” już jest na serwerze (folder app/${name}). Wybierz inną nazwę.`;
+  if (!APP_NAME_RE.test(name)) return codedError("app_name_invalid", "Nazwa: małe litery, cyfry, „-” lub „_” (np. immich, paperless-ngx).");
+  if (fs.existsSync(path.join(HOST_APPS_DIR, name))) return codedError("app_name_exists", `Aplikacja „${name}” już jest na serwerze (folder app/${name}). Wybierz inną nazwę.`, { name });
   return null;
 }
 
@@ -3115,13 +3520,13 @@ app.post("/api/apps/installer/adapt", requirePin, async (req, res) => {
   try {
     const name = normalizeText(req.body?.name).toLowerCase();
     const problem = installerCheckName(name);
-    if (problem) return res.status(400).json({ ok: false, message: problem });
+    if (problem) return apiError(res, 400, problem.code, problem.message, problem.vars);
     const range = /^\d{1,5}-\d{1,5}$/.test(String(req.body?.range || "")) ? req.body.range : "3000-3099";
     const host = normalizeText(req.body?.host);
-    const result = await adaptCompose({ name, compose: req.body?.compose, env: req.body?.env, range, host });
+    const result = await adaptCompose({ name, compose: req.body?.compose, env: req.body?.env, range, host, timeZone: req.body?.timeZone });
     res.json({ ok: true, ...result });
   } catch (error) {
-    res.status(400).json({ ok: false, message: error.message });
+    apiError(res, 400, error.code || "apps_error", error.message, error.vars || { error: error.message });
   }
 });
 
@@ -3129,11 +3534,11 @@ app.post("/api/apps/installer/commit", requirePin, (req, res) => {
   try {
     const name = normalizeText(req.body?.name).toLowerCase();
     const problem = installerCheckName(name);
-    if (problem) return res.status(400).json({ ok: false, message: problem });
+    if (problem) return apiError(res, 400, problem.code, problem.message, problem.vars);
     const compose = String(req.body?.compose || "");
     const doc = YAML.parseDocument(compose);
-    if (doc.errors.length) return res.status(400).json({ ok: false, message: `Compose ma błąd: ${doc.errors[0].message}` });
-    if (fs.existsSync(APPS_REQUEST_FILE)) return res.status(409).json({ ok: false, message: "Serwer jeszcze zakłada poprzednią aplikację — chwilę poczekaj." });
+    if (doc.errors.length) return apiError(res, 400, "compose_error", `Compose ma błąd: ${doc.errors[0].message}`, { error: doc.errors[0].message });
+    if (fs.existsSync(APPS_REQUEST_FILE)) return apiError(res, 409, "apps_busy_install", "Serwer jeszcze zakłada poprzednią aplikację — chwilę poczekaj.");
     writeJsonFile(APPS_STATE_FILE, { stan: "trwa", nazwa: name, komunikat: "Serwer zakłada foldery i sprawdza compose…", czas: new Date().toISOString() });
     writeJsonFile(APPS_REQUEST_FILE, { akcja: "zaloz", nazwa: name, compose, env: String(req.body?.env || ""), zlecono: new Date().toISOString() });
     res.json({ ok: true });
@@ -3148,18 +3553,18 @@ app.post("/api/apps/update", requirePin, async (req, res) => {
   try {
     const container = normalizeText(req.body?.container);
     const tag = normalizeText(req.body?.tag);
-    if (DOCKER_VERSION_EXCLUDE.has(container)) return res.status(400).json({ ok: false, message: "Ten kontener jest wykluczony z aktualizacji przez ten panel." });
-    if (!tag || !isStableTag(tag)) return res.status(400).json({ ok: false, message: "Niepoprawny numer wersji." });
+    if (DOCKER_VERSION_EXCLUDE.has(container)) return apiError(res, 400, "app_excluded", "Ten kontener jest wykluczony z aktualizacji przez ten panel.");
+    if (!tag || !isStableTag(tag)) return apiError(res, 400, "app_bad_version", "Niepoprawny numer wersji.");
     const { stack, service } = await containerStackAndService(container);
-    if (!APP_NAME_RE.test(stack) || !isSafeName(service)) return res.status(400).json({ ok: false, message: "Niepoprawna nazwa kontenera lub stosu." });
+    if (!APP_NAME_RE.test(stack) || !isSafeName(service)) return apiError(res, 400, "app_bad_name", "Niepoprawna nazwa kontenera lub stosu.");
     const composePath = findComposeFile(stack);
-    if (!composePath) return res.status(404).json({ ok: false, message: `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}.` });
+    if (!composePath) return apiError(res, 404, "compose_not_found", `Nie znaleziono pliku compose w ${path.join(HOST_APPS_DIR, stack)}.`, { path: path.join(HOST_APPS_DIR, stack) });
     if ((readJsonFile(APPS_STATE_FILE) || {}).stan === "trwa" || fs.existsSync(APPS_REQUEST_FILE)) {
-      return res.status(409).json({ ok: false, message: "Trwa inna praca z aplikacjami — poczekaj na jej koniec." });
+      return apiError(res, 409, "apps_busy", "Trwa inna praca z aplikacjami — poczekaj na jej koniec.");
     }
-    if ((readJsonFile(BACKUP_STATE_FILE) || {}).stan === "trwa") return res.status(409).json({ ok: false, message: "Trwa kopia zapasowa albo przywracanie — poczekaj na jej koniec." });
+    if ((readJsonFile(BACKUP_STATE_FILE) || {}).stan === "trwa") return apiError(res, 409, "backup_running", "Trwa kopia zapasowa albo przywracanie — poczekaj na jej koniec.");
     const { text, updated } = setServiceImageTag(fs.readFileSync(composePath, "utf8"), service, tag);
-    if (!updated) return res.status(404).json({ ok: false, message: `Nie znaleziono linii "image:" dla serwisu "${service}" w ${stack}/${path.basename(composePath)}.` });
+    if (!updated) return apiError(res, 404, "image_line_not_found", `Nie znaleziono linii "image:" dla serwisu "${service}" w ${stack}/${path.basename(composePath)}.`, { service, file: `${stack}/${path.basename(composePath)}` });
     // Kopia przed aktualizacją — gdy kopia zapasowa jest ustawiona (i użytkownik jej nie wyłączył).
     const kopia = Boolean((readJsonFile(BACKUP_SETTINGS_FILE) || {}).dysk) && req.body?.kopia !== false;
     writeJsonFile(APPS_STATE_FILE, { stan: "trwa", rodzaj: "aktualizacja", nazwa: stack, procent: 0, etap: "Czekam na serwer…", czas: new Date().toISOString() });
@@ -3210,7 +3615,8 @@ function backupAlerts() {
   const settings = readJsonFile(BACKUP_SETTINGS_FILE);
   const s = readJsonFile(BACKUP_STATE_FILE) || {};
   const now = new Date().toISOString();
-  const alert = (id, title, message) => ({ id, type: "backup", severity: "warning", title, message, resource: "kopia zapasowa", timestamp: now });
+  // code / vars — dla tłumaczeń (strona dobiera tekst); title / message po polsku zostają jako zapas.
+  const alert = (id, title, message, vars = {}) => ({ id, type: "backup", severity: "warning", title, message, resource: "kopia zapasowa", code: id.replace(/-/g, "_"), vars, timestamp: now });
   if (!settings?.dysk) {
     return [alert("backup-not-configured", "Kopia zapasowa nie jest ustawiona",
       "Serwer nie robi kopii zapasowych. Ustaw je w Zaplecze → Kopia zapasowa.")];
@@ -3218,7 +3624,8 @@ function backupAlerts() {
   const result = [];
   if (s.ostatnia?.wynik === "blad") {
     result.push(alert("backup-failed", "Ostatnia kopia zapasowa nie powiodła się",
-      `${s.ostatnia.komunikat || "Nieznany błąd."} (${serverLocalTime(s.ostatnia.data)})`));
+      `${s.ostatnia.komunikat || "Nieznany błąd."} (${serverLocalTime(s.ostatnia.data)})`,
+      { error: s.ostatnia.komunikat || "", date: serverLocalTime(s.ostatnia.data), errorCode: s.ostatnia.kod || "", errorVars: s.ostatnia.zmienne || {} }));
   }
   // Ostatnia pełna kopia („Wszystko”) — z listy kopii albo z ostatniej udanej.
   const full = (s.kopie_opis || []).filter((c) => !c.czesciowa && c.data).map((c) => c.data);
@@ -3233,7 +3640,8 @@ function backupAlerts() {
     const maxDays = BACKUP_MAX_AGE_DAYS[settings.czestotliwosc] ?? 2;
     if (days >= maxDays) {
       result.push(alert("backup-old", `Brak kopii zapasowej od ${days} dni`,
-        `Ostatnia pełna kopia: ${serverLocalTime(lastIso)}. Sprawdź, czy dysk na kopie jest podłączony.`));
+        `Ostatnia pełna kopia: ${serverLocalTime(lastIso)}. Sprawdź, czy dysk na kopie jest podłączony.`,
+        { n: days, date: serverLocalTime(lastIso) }));
     }
   }
   return result;
@@ -3272,6 +3680,11 @@ app.get("/api/tools/backup/status", (req, res) => {
     percent: waiting && s.stan !== "trwa" ? 0 : (Number(s.procent) || 0),
     step: waiting && s.stan !== "trwa" ? "Czekam na serwer…" : (s.etap || ""),
     message: s.komunikat || "",
+    // Kody dla tłumaczeń (plan „Język”): etap i komunikat zadania if-backup, polskie teksty zostają.
+    stepCode: waiting && s.stan !== "trwa" ? "waiting" : (s.etap_kod || ""),
+    stepVars: waiting && s.stan !== "trwa" ? {} : (s.etap_zmienne || {}),
+    messageCode: s.komunikat_kod || "",
+    messageVars: s.zmienne || {},
     kind: waiting && s.stan !== "trwa" ? (requested === "przywroc" ? "przywracanie" : "kopia") : (s.rodzaj || "kopia"),
     last: s.ostatnia || null,
     lastRestore: s.przywrocenie || null,
@@ -3294,21 +3707,21 @@ app.post("/api/tools/backup/restore", requirePin, (req, res) => {
   const aplikacja = normalizeText(req.body?.aplikacja);
   const copy = (s.kopie_opis || []).find((c) => c.nazwa === kopia);
   if (!copy || !(aplikacja === "*" ? copy.aplikacje?.length : (copy.aplikacje || []).includes(aplikacja))) {
-    return res.status(400).json({ error: "Nie ma takiej aplikacji w tej kopii — odśwież listę kopii." });
+    return apiError(res, 400, "restore_no_app", "Nie ma takiej aplikacji w tej kopii — odśwież listę kopii.");
   }
-  if (s.stan === "trwa") return res.status(409).json({ error: "Trwa kopia albo przywracanie — poczekaj na koniec." });
+  if (s.stan === "trwa") return apiError(res, 409, "backup_busy", "Trwa kopia albo przywracanie — poczekaj na koniec.");
   writeJsonFile(BACKUP_REQUEST_FILE, { akcja: "przywroc", kopia, aplikacja, zlecono: new Date().toISOString() });
   res.json({ ok: true });
 });
 
 app.post("/api/tools/backup/run", requirePin, (req, res) => {
   const settings = readJsonFile(BACKUP_SETTINGS_FILE) || {};
-  if (!settings.dysk) return res.status(400).json({ error: "Najpierw wybierz dysk dla kopii zapasowych i zapisz ustawienia." });
-  if ((readJsonFile(BACKUP_STATE_FILE) || {}).stan === "trwa") return res.status(409).json({ error: "Trwa kopia albo przywracanie — poczekaj na koniec." });
+  if (!settings.dysk) return apiError(res, 400, "backup_no_disk", "Najpierw wybierz dysk dla kopii zapasowych i zapisz ustawienia.");
+  if ((readJsonFile(BACKUP_STATE_FILE) || {}).stan === "trwa") return apiError(res, 409, "backup_busy", "Trwa kopia albo przywracanie — poczekaj na koniec.");
   // Puste = wszystko według ustawień; nazwa aplikacji = kopia tylko tej aplikacji.
   const aplikacja = normalizeText(req.body?.aplikacja);
   if (aplikacja && !(readJsonFile(BACKUP_DISKS_FILE)?.aplikacje || []).includes(aplikacja)) {
-    return res.status(400).json({ error: "Nie ma takiej aplikacji — sprawdź dyski jeszcze raz." });
+    return apiError(res, 400, "backup_no_app", "Nie ma takiej aplikacji — sprawdź dyski jeszcze raz.");
   }
   writeJsonFile(BACKUP_REQUEST_FILE, { akcja: "kopia", ...(aplikacja ? { aplikacja } : {}), zlecono: new Date().toISOString() });
   res.json({ ok: true });
@@ -3326,7 +3739,7 @@ app.put("/api/tools/backup/settings", requirePin, (req, res) => {
   const disks = readJsonFile(BACKUP_DISKS_FILE);
   const id = normalizeText(req.body?.dysk);
   const disk = (disks?.dyski || []).find((d) => d.id === id);
-  if (!disk) return res.status(400).json({ error: "Wybierz dysk z listy (albo sprawdź dyski jeszcze raz)." });
+  if (!disk) return apiError(res, 400, "backup_pick_disk", "Wybierz dysk z listy (albo sprawdź dyski jeszcze raz).");
   if (!disk.nadaje) return res.status(400).json({ error: disk.uwaga || "Ten dysk nie nadaje się na kopie." });
   const zakres = {
     aplikacje: req.body?.zakres?.aplikacje !== false,
@@ -3334,12 +3747,12 @@ app.put("/api/tools/backup/settings", requirePin, (req, res) => {
     ustawienia: req.body?.zakres?.ustawienia !== false
   };
   if (!zakres.aplikacje && !zakres.pliki && !zakres.ustawienia) {
-    return res.status(400).json({ error: "Zaznacz co najmniej jedną rzecz do kopiowania." });
+    return apiError(res, 400, "backup_nothing", "Zaznacz co najmniej jedną rzecz do kopiowania.");
   }
   const czestotliwosc = BACKUP_FREQUENCIES.includes(req.body?.czestotliwosc) ? req.body.czestotliwosc : "codziennie";
   const ile = Math.round(Number(req.body?.ile));
   if (!Number.isFinite(ile) || ile < 1 || ile > 60) {
-    return res.status(400).json({ error: "Liczba kopii: od 1 do 60." });
+    return apiError(res, 400, "backup_count", "Liczba kopii: od 1 do 60.");
   }
   const previous = readJsonFile(BACKUP_SETTINGS_FILE) || {};
   const settings = { ...previous, dysk: disk.id, dyskNazwa: disk.nazwa, zakres, czestotliwosc, ile, zapisano: new Date().toISOString() };

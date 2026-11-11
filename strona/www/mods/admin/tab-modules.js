@@ -10,8 +10,16 @@ const MODULES_REGISTRY = [
   {
     id: "kiosk",
     icon: "monitor",
-    name: "Kiosk Serwera",
+    name: "Kiosk Serwera",   // zapas; napis z admin.modules.kiosk_name / _desc
     desc: "Tablet ze statusem serwera — temperatury, dyski, alerty, żywy podgląd kontenerów (styl ctop), status kontenerów i radio internetowe."
+  },
+  {
+    id: "language",
+    icon: "languages",
+    name: "Tłumacz",
+    desc: "Tłumaczenie strony i Zaplecza, nowe języki, eksport i wgrywanie plików języka.",
+    // Włącznik w Ustawieniach ogólnych (Darek 11.11.2026); wyłączony — kafel z dopiskiem, karta podpowiada, gdzie włączyć.
+    isOff: () => !state.settings?.translatorEnabled
   },
   {
     id: "ports",
@@ -25,16 +33,17 @@ function renderModulesHubTab() {
   const tiles = MODULES_REGISTRY.map((mod) => `
     <button type="button" class="module-tile" data-module="${escapeHtml(mod.id)}">
       <span class="module-tile-icon">${uiIcon(mod.icon, 28)}</span>
-      <span class="module-tile-name">${escapeHtml(mod.name)}</span>
-      <span class="module-tile-desc">${escapeHtml(mod.desc)}</span>
+      <span class="module-tile-name">${escapeHtml(IF_I18N.has(`admin.modules.${mod.id}_name`) ? t(`admin.modules.${mod.id}_name`) : mod.name)}</span>
+      <span class="module-tile-desc">${escapeHtml(IF_I18N.has(`admin.modules.${mod.id}_desc`) ? t(`admin.modules.${mod.id}_desc`) : mod.desc)}</span>
+      ${mod.isOff?.() ? `<span class="backup-badge">${escapeHtml(t("admin.modules.off"))}</span>` : ""}
     </button>
   `).join("");
 
   return `
     <div class="admin-tab-container">
       <section class="admin-section-card">
-        <h2>${uiIcon("modules", 22)} Moduły</h2>
-        <p class="settings-note">Nakładki na usługi self-hosted, dopracowane pod kątem prostoty dla domowników. Wybierz moduł, aby zmienić jego ustawienia.</p>
+        <h2>${uiIcon("modules", 22)} ${escapeHtml(t("admin.modules.title"))}</h2>
+        <p class="settings-note">${escapeHtml(t("admin.modules.intro"))}</p>
         <div class="modules-hub-grid" style="margin-top: 18px;">
           ${tiles}
         </div>

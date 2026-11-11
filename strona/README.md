@@ -25,8 +25,9 @@ strony (0.3.1, 0.3.2…).
   chowany pasek boczny, kafelki CPU i RAM w nagłówku (kolor wg progów) i dzwonek alertów.
   Awarie i przekroczone progi temperatur pokazuje pasek na górze strony (zamykany ✕).
   Ikonka **?** w pasku bocznym — **Informator**: skrócona obsługa, gdzie co jest.
+  Ikonka tłumacza <img src="docs/ikony/tlumacz.svg" alt="ikonka tłumacza" height="16"> (gdy włączony Tłumacz) — tłumaczenie strony.
 - **Zaplecze** (chronione PIN-em, tryb dzień/noc wspólny ze Stroną Główną):
-  - Ustawienia ogólne,
+  - Ustawienia ogólne — m.in. **język strony** (angielski, polski, własne) i włącznik Tłumacza,
   - Centrum Alertów — stan kontenerów, temperatury, RAM, dyski, logi kontenerów;
     progi temperatur dla każdego czujnika i progi obciążenia CPU/RAM,
   - Statystyki Live — CPU, temperatury wszystkich czujników, RAM, dyski, sieć, procesy,
@@ -35,7 +36,7 @@ strony (0.3.1, 0.3.2…).
     sprawdzenie, przy błędzie powrót z danymi),
   - Aplikacje → Instalator — dostosowuje compose aplikacji do serwera i zakłada ją,
   - Kopia zapasowa i przywracanie,
-  - Moduły (Kiosk, Tester portów), edytor wyglądu Zaplecza (osobno dzień i noc).
+  - Moduły (Kiosk, Tester portów, Tłumacz), edytor wyglądu Zaplecza (osobno dzień i noc).
 - **Kiosk statusu serwera** — Status serwera, Live (zużycie per kontener),
   Status kontenerów, Radio.
 
@@ -225,7 +226,7 @@ i najnowsza wersja programu serwera. Nowszą instalujesz w terminalu: `sudo if-s
 Wklejasz compose z repozytorium aplikacji (i jej `.env`, jeśli ma). **„Dostosuj”** pokazuje compose
 dla serwera z listą zmian: dane w `~/docker/app-data/<nazwa>` (obejmie je kopia zapasowa), stała
 wersja zamiast `latest`, wolne porty z puli wybranego rodzaju aplikacji, automatyczny start,
-strefa czasowa. **„Zatwierdź”** — serwer (zadanie `if-aplikacje`, ustawia je `if-server`) zakłada
+strefa czasowa (z Ustawień ogólnych; przy „automatycznej” — strefa przeglądarki, z której instalujesz). **„Zatwierdź”** — serwer (zadanie `if-aplikacje`, ustawia je `if-server`) zakłada
 foldery z prawami użytkownika, zapisuje compose i sprawdza go; aplikację uruchamiasz w Dockge.
 Nazwa, która już jest, jest odrzucana — nic nie jest nadpisywane.
 
@@ -240,6 +241,35 @@ Kopie robi serwer (zadanie `if-backup`, ustawia je `if-server`) według Twoich u
 - **Przywracanie** — wszystkie aplikacje albo wybrana; obecne dane trafiają do `~/backups/przed-przywroceniem`.
 
 Brak kopii, kopia za stara albo nieudana — alert w Centrum Alertów.
+
+## Języki i Tłumacz (Zaplecze → Ustawienia ogólne, Moduły → Tłumacz)
+
+Strona i Zaplecze są **po angielsku albo po polsku** — wybór w Ustawieniach ogólnych → Język / Language
+(jeden dla całości). Angielski jest językiem bazowym: napis bez tłumaczenia pokazuje się po angielsku.
+Tego, co wpisujesz sam (tytuł, nazwy stron, sekcji i linków), nie tłumaczymy.
+
+Inne języki dodajesz w module **Tłumacz** (włącznik w Ustawieniach ogólnych; potem kafel w Modułach
+i ikonka tłumacza <img src="docs/ikony/tlumacz.svg" alt="ikonka tłumacza" height="16"> na Stronie Głównej):
+
+- **lista języków** z postępem tłumaczenia, **eksport** i **usuwanie** (do `config/langs/deleted`, da się odzyskać),
+- **nowy język** (kod i nazwa), **wgranie pliku** języka, **wzór angielski** (`en.json`) do tłumaczenia poza stroną,
+- **edytor**: angielski | tłumaczenie, filtry (sekcja — Strona / Zaplecze / Moduły, tylko nieprzetłumaczone,
+  wyszukiwarka), formy liczby mnogiej Twojego języka, ostrzeżenie o brakującej wartości `{…}`.
+
+Ten sam tekst w dwóch miejscach strony to dwa osobne wpisy — każde miejsce tłumaczysz osobno.
+Twoje tłumaczenia leżą w danych strony (`config/langs/<kod>.json`) — aktualizacja ich nie rusza,
+kopia zapasowa je obejmuje.
+
+Napisy modułów leżą w ich folderach: `www/mods/<moduł>/langs/<kod>.json` (np. `mods/ports/langs/en.json`)
+— jeden płaski plik na język: napisy i opis miejsca `_desc`. Strona dokłada je do grupy „Moduły” w Tłumaczu
+pod nazwą folderu modułu, więc moduł nie nadpisze napisów strony ani innego modułu. Twoje tłumaczenia modułów
+zapisują się w tym samym pliku języka co reszta (`config/langs/<kod>.json`).
+
+### Formaty i jednostki (Zaplecze → Ustawienia ogólne)
+
+Strefa czasowa (domyślnie strefa przeglądarki), wzór daty i godziny („Według języka” albo wybrany, np. 31.12.2026
+albo 12/31/2026), przecinek lub kropka w liczbach oraz °C albo °F. Przy °F wszystko jest w °F — także progi
+w Centrum alertów (serwer liczy w °C i przelicza przy zapisie). Pod polami podgląd „Teraz: …”.
 
 ## Progi alarmów
 

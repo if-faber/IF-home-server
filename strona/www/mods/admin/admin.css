@@ -106,55 +106,6 @@ select:-webkit-autofill {
   transition: background-color 5000s ease-in-out 0s;
 }
 
-/* Ekran Blokady PIN (W 100% ujednolicony z oknami modalnymi IF-startpage) */
-.admin-lock-screen {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 20px;
-  background: rgb(0 0 0 / var(--modal-backdrop-alpha, 0.62));
-  backdrop-filter: blur(var(--modal-backdrop-blur, 3px));
-  -webkit-backdrop-filter: blur(var(--modal-backdrop-blur, 3px));
-}
-
-.admin-lock-screen form {
-  width: min(440px, calc(100vw - 28px));
-  padding: 24px;
-  display: grid;
-  gap: 16px;
-  border-radius: var(--modal-radius, 20px);
-  border: 1px solid var(--line);
-  background: rgb(var(--modal-bg-rgb, var(--surface-base-rgb, 14 24 29)) / max(var(--modal-alpha, 0.92), 0.2));
-  backdrop-filter: blur(var(--modal-glass-blur, 16px)) saturate(var(--glass-saturation, 100%));
-  -webkit-backdrop-filter: blur(var(--modal-glass-blur, 16px)) saturate(var(--glass-saturation, 100%));
-  color: var(--text);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
-}
-
-.admin-lock-screen form .modal-heading h2 {
-  margin: 3px 0 0;
-  font-size: 22px;
-  color: var(--text);
-}
-
-.admin-lock-screen form label {
-  display: grid;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.admin-lock-screen form menu {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin: 6px 0 0;
-  padding: 0;
-}
-
 /* Główny Układ Zaplecza (Layout) */
 .admin-layout {
   display: grid;
@@ -746,3 +697,103 @@ dialog.if-confirm { width: min(440px, calc(100vw - 28px)); }
 @media (max-width: 900px) { .installer-row, .installer-columns { grid-template-columns: 1fr; } }
 /* Aplikacje → Aktualizacje: postęp aktualizacji przez serwer. */
 .apps-update-progress { display: grid; gap: 6px; margin-bottom: 12px; }
+
+/* ─── ☰ Chowanie menu Zaplecza i układ na telefon (Darek 11.11.2026) ───────────
+   Przycisk .menu-toggle ma wygląd ze styles.css (ten sam co na stronie głównej). */
+.admin-layout .menu-toggle { left: calc(var(--admin-sidebar-width, 280px) - 56px); }
+.admin-layout.sidebar-hidden { grid-template-columns: minmax(0, 1fr); }
+.admin-layout.sidebar-hidden .admin-sidebar { display: none; }
+.admin-layout.sidebar-hidden .menu-toggle { left: 18px; }
+.admin-layout.sidebar-hidden .admin-main { padding-left: 82px; }
+
+@media (max-width: 900px) {
+  .admin-layout { grid-template-columns: minmax(0, 1fr); }
+  .admin-layout .menu-toggle { left: 16px; top: 16px; }
+  .admin-layout .admin-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    padding-top: 72px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .admin-layout .admin-main,
+  .admin-layout.sidebar-hidden .admin-main { padding: 76px 16px 24px; }
+  .admin-layout:not(.sidebar-hidden) .admin-main { padding-top: 16px; }
+  .admin-main .toolbar { flex-wrap: wrap; }
+
+  /* Treść kart mieści się w szerokości telefonu (Darek 11.11.2026: „zawartość wychodzi poza kafel”). */
+  .admin-layout .admin-main { min-width: 0; overflow-x: hidden; }
+  .admin-tab-container, .admin-section-card { min-width: 0; max-width: 100%; }
+  .admin-section-card { padding: 16px; }
+  /* Formularze w jednej kolumnie (także te z kolumnami wpisanymi wprost w kod karty, np. Kiosk). */
+  .admin-form-grid, .admin-form-grid.three-cols { grid-template-columns: minmax(0, 1fr) !important; }
+  /* Tabele (progi temperatur, aktualizacje aplikacji, lista ikon) przewijają się w bok wewnątrz karty. */
+  .admin-content table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Progi temperatur i obciążenia: na telefonie każdy czujnik jako kafelek — nazwa u góry,
+     pod nią „Obecnie / Uwaga / Alarm” w trzech równych kolumnach (Darek: „rozjechane kafelki”). */
+  .temp-thresholds-table, .temp-thresholds-table tbody { display: block; overflow: visible; }
+  .temp-thresholds-table thead { display: none; }
+  .temp-thresholds-table tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .temp-thresholds-table td { padding: 0; border: 0; min-width: 0; }
+  .temp-thresholds-table td:first-child { grid-column: 1 / -1; font-weight: 700; }
+  .temp-thresholds-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .temp-thresholds-table input { width: 100%; }
+  .temp-thresholds-table .temp-now { min-width: 0; }
+  /* Aplikacje → Aktualizacje: każda aplikacja jako kafelek — nazwa u góry, wersje obok siebie,
+     przyciski pod spodem (pomiar na telefonie Darka: tabela do 615 px przy karcie 361 px). */
+  .apps-updates-table, .apps-updates-table tbody { display: block; overflow: visible; }
+  .apps-updates-table thead { display: none; }
+  .apps-updates-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    padding: 12px 0;
+  }
+  .apps-updates-table td { padding: 0 !important; min-width: 0; overflow-wrap: anywhere; }
+  .apps-updates-table td:first-child, .apps-updates-table td.upd-wide { grid-column: 1 / -1; }
+  .apps-updates-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .apps-updates-table .upd-buttons { flex-wrap: wrap; }
+  /* Lista ikon: obrazek, nazwa, a przycisk pod nazwą (Darek: „Kopiuj nazwę” ucięte). */
+  .icons-list-table, .icons-list-table tbody { display: block; }
+  .icons-list-table thead { display: none; }
+  .icons-list-table tr { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .icons-list-table td { padding: 0; border: 0; min-width: 0; overflow-wrap: anywhere; }
+  .icons-list-table td:first-child { width: auto; grid-row: span 2; }
+  .icons-list-table td:last-child { width: auto; white-space: normal; grid-column: 2; }
+  /* Strony i sekcje: wiersz linku — przyciski pod nazwą zamiast poza ekranem. */
+  .hp-link-row { flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .hp-link-row > div:first-child { flex: 1 1 100%; }
+  .hp-link-actions { margin-left: 0 !important; flex-wrap: wrap; }
+  /* Centrum alertów: przyciski filtrów zawijają się do nowej linii. */
+  .filter-actions { flex-wrap: wrap; }
+}
+
+/* Włącznik z podpisem w formularzu (Ustawienia ogólne → Moduł „Tłumacz”). */
+.checkbox-row { display: flex; align-items: center; gap: 8px; min-height: 40px; font-weight: 600; text-transform: none; }
+.checkbox-row input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex: none; }
+
+/* Podtytuł grupy pól w formularzu (Ustawienia ogólne → Formaty i jednostki). */
+.settings-subtitle { margin: 22px 0 4px; font-size: 15px; color: var(--accent-alt, var(--accent)); }

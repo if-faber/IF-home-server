@@ -6,7 +6,7 @@ async function unlockAdmin(e) {
   const pin = String(input?.value || "").trim();
   
   if (!pin) {
-    return showToast("Wpisz kod PIN administratora.");
+    return showToast(t("admin.messages.login_enter_pin"));
   }
 
   try {
@@ -27,27 +27,41 @@ async function unlockAdmin(e) {
     state.theme = themeData.theme || {};
     if (typeof useAdminThemes === "function") useAdminThemes(adminThemeData);
 
-    document.querySelector("#pinScreen").style.display = "none";
+    hidePinDialog();
     document.querySelector("#adminDashboard").style.display = "grid";
 
     const savedTab = sessionStorage.getItem("homedash.admin.activeTab") || state.activeTab || "homepage";
     if (typeof switchTab === "function") {
       switchTab(savedTab);
     }
-    showToast("Zalogowano do Zaplecza.");
+    showToast(t("admin.messages.login_ok"));
   } catch (error) {
     clearStoredAdminPin();
     if (input) {
       input.value = "";
       input.focus();
     }
-    showToast(error.message || "Niepoprawny PIN administratora.");
+    showToast(error.message || t("admin.messages.login_bad_pin"));
   }
+}
+
+// Okienko PIN Zaplecza (wspólne ze stroną): pokazanie i schowanie.
+function showPinDialog() {
+  const dialog = document.querySelector("#pinDialog");
+  const input = document.querySelector("#adminPinInput");
+  if (input) input.value = "";
+  if (dialog && !dialog.open) dialog.showModal();
+  input?.focus();
+}
+
+function hidePinDialog() {
+  const dialog = document.querySelector("#pinDialog");
+  if (dialog?.open) dialog.close();
 }
 
 async function autoUnlockIfStored() {
   const storedPin = getStoredAdminPin();
-  if (!storedPin) return;
+  if (!storedPin) return showPinDialog();
 
   try {
     await request("/api/admin/unlock", {
@@ -67,7 +81,7 @@ async function autoUnlockIfStored() {
     state.theme = themeData.theme || {};
     if (typeof useAdminThemes === "function") useAdminThemes(adminThemeData);
 
-    document.querySelector("#pinScreen").style.display = "none";
+    hidePinDialog();
     document.querySelector("#adminDashboard").style.display = "grid";
 
     const savedTab = sessionStorage.getItem("homedash.admin.activeTab") || state.activeTab || "homepage";
@@ -76,21 +90,15 @@ async function autoUnlockIfStored() {
     }
   } catch {
     clearStoredAdminPin();
-    const input = document.querySelector("#adminPinInput");
-    if (input) input.value = "";
+    showPinDialog();
   }
 }
 
 function logoutAdmin() {
   clearStoredAdminPin();
-  const input = document.querySelector("#adminPinInput");
-  if (input) {
-    input.value = "";
-    input.focus();
-  }
   document.querySelector("#adminDashboard").style.display = "none";
-  document.querySelector("#pinScreen").style.display = "flex";
-  showToast("Wylogowano z Zaplecza.");
+  showPinDialog();
+  showToast(t("admin.messages.logged_out"));
 }
 
 window.unlockAdmin = unlockAdmin;

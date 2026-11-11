@@ -14,12 +14,15 @@
       try { document.documentElement.dataset.mode = localStorage.getItem("ifs.mode") === "d" ? "d" : "n"; }
       catch (e) { document.documentElement.dataset.mode = "n"; }
     </script>
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=0.5-m1">
     <link rel="stylesheet" id="customCss-d" href="/custom/custom-d.css">
     <link rel="stylesheet" id="customCss-n" href="/custom/custom-n.css">
     <link rel="stylesheet" href="./mods/top/top.css?v=0.3.6c">
-    <script src="./mods/top/top.js?v=0.3.6c" defer></script>
-    <script src="./ui-icons.js" defer></script>
+    <!-- Rdzeń tłumaczeń: napisy wybranego języka (z serwera), potem funkcja t(). Przed resztą skryptów. -->
+    <script src="/lang.js" defer></script>
+    <script src="./i18n.js" defer></script>
+    <script src="./mods/top/top.js?v=0.5-f1" defer></script>
+    <script src="./ui-icons.js?v=0.5-f1" defer></script>
     <script src="./app.js" defer></script>
   </head>
   <body class="theme-nas">
