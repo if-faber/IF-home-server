@@ -378,8 +378,16 @@ warn() {
 
 # run <opis> <polecenie...> — polecenie w tle ze wskaźnikiem postępu.
 # Błąd = kod 1 (przy set -e w przepisie składnika przerywa jego instalację).
+# apt-get czeka do APT_LOCK_TIMEOUT s na zwolnienie blokady dpkg, zamiast od razu zwracać błąd —
+# w tle mogą pracować inne apt (lista aktualizacji dla strony, automatyczne aktualizacje Debiana).
+# Przypadek: if-media 11.11.2026, „Nie udało się uzyskać blokady /var/lib/dpkg/lock-frontend”.
+APT_LOCK_TIMEOUT=300
 run() {
     local desc="$1"; shift
+    if [ "${1-}" = "apt-get" ]; then
+        shift
+        set -- apt-get -o "DPkg::Lock::Timeout=$APT_LOCK_TIMEOUT" "$@"
+    fi
     echo "\$ $*" >> "$LOG_FILE"
 
     ( "$@" >>"$LOG_FILE" 2>&1 ) &
